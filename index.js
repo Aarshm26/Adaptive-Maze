@@ -288,8 +288,9 @@ function spawnEnemies() {
         
         gameState.enemies.push({
             x, y,
-            intelligence: 0.5 + (Math.random() * 0.5 * gameState.difficultyLevel),
-            lastMove: { x: 0, y: 0 }
+            intelligence: 0.2 + (Math.random() * 0.3 * gameState.difficultyLevel),
+            lastMove: { x: 0, y: 0 },
+            path: [] // For storing A* path
         });
     }
 }
@@ -348,42 +349,160 @@ function update() {
     render();
 }
 
-// Move enemies using basic AI
+// A* Pathfinding implementation
+function aStarPathfinding(start, end) {
+    // Create open and closed lists
+    const openList = [];
+    const closedList = [];
+    
+    // Calculate heuristic (Manhattan distance)
+    const heuristic = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    
+    // Add starting point to open list
+    openList.push({
+        x: start.x,
+        y: start.y,
+        g: 0,
+        h: heuristic(start, end),
+        f: heuristic(start, end),
+        parent: null
+    });
+    
+    while (openList.length > 0) {
+        // Sort the open list to get the node with the lowest f value
+        openList.sort((a, b) => a.f - b.f);
+        
+        // Get the node with the lowest f score
+        const current = openList.shift();
+        
+        // Add current to closed list
+        closedList.push(current);
+        
+        // Check if we've reached the destination
+        if (current.x === end.x && current.y === end.y) {
+            // Backtrack to get the path
+            const path = [];
+            let currentNode = current;
+            
+            while (currentNode.parent) {
+                path.push({ x: currentNode.x, y: currentNode.y });
+                currentNode = currentNode.parent;
+            }
+            
+            // Return the path in reverse (from start to end)
+            return path.reverse();
+        }
+        
+        // Check neighbors (4 directions: up, right, down, left)
+        const directions = [
+            { dx: 0, dy: -1 }, // Up
+            { dx: 1, dy: 0 },  // Right
+            { dx: 0, dy: 1 },  // Down
+            { dx: -1, dy: 0 }  // Left
+        ];
+        
+        for (const dir of directions) {
+            const nx = current.x + dir.dx;
+            const ny = current.y + dir.dy;
+            
+            // Check if the neighbor is valid
+            if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE || 
+                gameState.maze[ny][nx].type === 'wall') {
+                continue;
+            }
+            
+            // Check if the neighbor is in the closed list
+            if (closedList.some(node => node.x === nx && node.y === ny)) {
+                continue;
+            }
+            
+            // Calculate g, h, and f values
+            const g = current.g + 1; // Cost to move is 1
+            const h = heuristic({x: nx, y: ny}, end);
+            const f = g + h;
+            
+            // Check if the neighbor is already in the open list
+            const existingOpenNode = openList.find(node => node.x === nx && node.y === ny);
+            
+            if (existingOpenNode) {
+                // If we have a better path, update the node
+                if (g < existingOpenNode.g) {
+                    existingOpenNode.g = g;
+                    existingOpenNode.f = g + existingOpenNode.h;
+                    existingOpenNode.parent = current;
+                }
+            } else {
+                // Add neighbor to open list
+                openList.push({
+                    x: nx,
+                    y: ny,
+                    g: g,
+                    h: h,
+                    f: f,
+                    parent: current
+                });
+            }
+        }
+    }
+    
+    // No path found
+    return [];
+}
+
+// Move enemies using A* pathfinding
 function moveEnemies() {
     for (const enemy of gameState.enemies) {
         // Decide whether to use intelligence or random movement
         if (Math.random() < enemy.intelligence) {
-            // Basic pathfinding towards player
-            const dx = Math.sign(gameState.player.x - enemy.x);
-            const dy = Math.sign(gameState.player.y - enemy.y);
-            
-            // Try to move in x or y direction (prefer dominant direction)
-            let moved = false;
-            
-            if (Math.abs(dx) > Math.abs(dy) || (Math.abs(dx) === Math.abs(dy) && Math.random() < 0.5)) {
-                if (isValidMove(enemy.x + dx, enemy.y)) {
-                    enemy.x += dx;
-                    enemy.lastMove = { x: dx, y: 0 };
-                    moved = true;
-                }
+            // Use A* pathfinding to find path to player
+            if (enemy.path.length === 0 || gameState.tickCount % 5 === 0) {
+                // Recalculate path every 5 ticks or when path is empty
+                enemy.path = aStarPathfinding(
+                    { x: enemy.x, y: enemy.y },
+                    { x: gameState.player.x, y: gameState.player.y }
+                );
             }
             
-            if (!moved) {
-                if (isValidMove(enemy.x, enemy.y + dy)) {
-                    enemy.y += dy;
-                    enemy.lastMove = { x: 0, y: dy };
-                    moved = true;
+            // Follow the path if it exists
+            if (enemy.path.length > 0) {
+                const nextStep = enemy.path.shift();
+                const dx = nextStep.x - enemy.x;
+                const dy = nextStep.y - enemy.y;
+                
+                enemy.x = nextStep.x;
+                enemy.y = nextStep.y;
+                enemy.lastMove = { x: dx, y: dy };
+            } else {
+                // Fallback to basic movement if no path found
+                const dx = Math.sign(gameState.player.x - enemy.x);
+                const dy = Math.sign(gameState.player.y - enemy.y);
+                
+                let moved = false;
+                
+                if (Math.abs(dx) > Math.abs(dy) || (Math.abs(dx) === Math.abs(dy) && Math.random() < 0.5)) {
+                    if (isValidMove(enemy.x + dx, enemy.y)) {
+                        enemy.x += dx;
+                        enemy.lastMove = { x: dx, y: 0 };
+                        moved = true;
+                    }
                 }
-            }
-            
-            // If still couldn't move, try the other direction
-            if (!moved) {
-                if (dx !== 0 && isValidMove(enemy.x + dx, enemy.y)) {
-                    enemy.x += dx;
-                    enemy.lastMove = { x: dx, y: 0 };
-                } else if (dy !== 0 && isValidMove(enemy.x, enemy.y + dy)) {
-                    enemy.y += dy;
-                    enemy.lastMove = { x: 0, y: dy };
+                
+                if (!moved) {
+                    if (isValidMove(enemy.x, enemy.y + dy)) {
+                        enemy.y += dy;
+                        enemy.lastMove = { x: 0, y: dy };
+                        moved = true;
+                    }
+                }
+                
+                if (!moved) {
+                    if (dx !== 0 && isValidMove(enemy.x + dx, enemy.y)) {
+                        enemy.x += dx;
+                        enemy.lastMove = { x: dx, y: 0 };
+                    } else if (dy !== 0 && isValidMove(enemy.x, enemy.y + dy)) {
+                        enemy.y += dy;
+                        enemy.lastMove = { x: 0, y: dy };
+                    }
                 }
             }
         } else {
