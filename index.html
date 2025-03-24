@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adaptive Maze Escape</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --accent: #4895ef;
+            --danger: #e63946;
+            --success: #2dc653;
+            --warning: #ff9f1c;
+            --info: #00b4d8;
+            --background: #f8f9fa;
+            --surface: #ffffff;
+            --text: #2b2d42;
+            --text-light: #6c757d;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow-x: hidden;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--background);
+            color: var(--text);
+            padding: 10px;
+            line-height: 1.6;
+        }
+        
+        .game-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: var(--primary);
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            width: 100%;
+        }
+        
+        .game-subtitle {
+            font-size: 1rem;
+            color: var(--text-light);
+            margin-bottom: 15px;
+            text-align: center;
+            width: 100%;
+        }
+        
+        .main-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+            flex-wrap: wrap;
+            margin-bottom: 20px !important;
+        }
+        
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: var(--surface);
+            padding: 15px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            flex: 1 1 400px;
+            min-width: 0;
+        }
+        
+        .game-container:hover {
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
+        }
+        
+        .controls-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .controls {
+            text-align: center;
+            background-color: var(--primary);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-weight: 500;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            font-size: 0.9rem;
+        }
+        
+        .controls .key {
+            margin: 0 3px;
+        }
+        
+        .canvas-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            position: relative;
+        }
+        
+        canvas {
+            border: 3px solid var(--primary);
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .stats-container {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f1f3f9;
+            border-radius: 10px;
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 10px;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .health-value {
+            color: var(--danger);
+        }
+        
+        .level-value {
+            color: var(--warning);
+        }
+        
+        .score-value {
+            color: var(--success);
+        }
+        
+        .message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 25px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 500;
+            display: none;
+            z-index: 10;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -60%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+        
+        .instructions {
+            flex: 1 1 300px;
+            padding: 20px;
+            background-color: var(--surface);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            max-height: 80vh; 
+            overflow-y: auto; 
+        }
+                
+        .instructions h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        
+        .key {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            background-color: var(--primary);
+            color: white;
+            border-radius: 6px;
+            margin: 0 3px;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            font-size: 0.9rem;
+        }
+        
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #f1f3f9;
+            padding: 8px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            flex: 1 1 45%;
+            min-width: 170px;
+            font-size: 0.9rem;
+        }
+        
+        .legend-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .legend-color {
+            min-width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .player-color {
+            background-color: var(--primary);
+            border-radius: 50%;
+        }
+        
+        .exit-color {
+            background-color: var(--success);
+        }
+        
+        .enemy-color {
+            background-color: var(--warning);
+        }
+        
+        .health-color {
+            background-color: var(--danger);
+            border-radius: 50%;
+        }
+        
+        .speed-color {
+            background-color: var(--info);
+            border-radius: 50%;
+        }
+        
+        .game-tip {
+            font-style: italic;
+            color: var(--text-light);
+            margin-top: 15px;
+            padding: 10px;
+            border-left: 3px solid var(--accent);
+            background-color: rgba(72, 149, 239, 0.1);
+            border-radius: 0 8px 8px 0;
+            font-size: 0.9rem;
+        }
+        
+        .difficulty-info {
+            margin-top: 15px;
+            margin-bottom: 20px; 
+            padding: 12px;
+            background-color: #f1f3f9;
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+        difficulty-info:last-child {
+            margin-bottom: 30px; 
+        }
+        .difficulty-info h4 {
+            color: var(--primary);
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+        
+        .difficulty-info ul {
+            padding-left: 20px;
+        }
+        
+        .difficulty-info li {
+            margin-bottom: 4px;
+        }
+        
+        @media (max-width: 992px) {
+            .main-container {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .game-container, .instructions {
+                width: 100%;
+                max-width: 600px;
+                max-height: 400px;
+            }
+        }
+        
+        @media (max-width: 600px) {
+
+            .instructions{
+                max-height: 350px
+            }
+            body {
+                padding: 5px;
+            }
+            
+            .game-title {
+                font-size: 1.5rem;
+            }
+            
+            .game-subtitle {
+                font-size: 0.9rem;
+            }
+            
+            .game-container, .instructions {
+                padding: 10px;
+                border-radius: 10px;
+            }
+            
+            .stats-container {
+                flex-wrap: wrap;
+                justify-content: space-around;
+                gap: 5px;
+            }
+            
+            .stat-item {
+                min-width: 80px;
+            }
+            
+            .legend-item {
+                flex: 1 1 100%;
+            }
+            
+            .difficulty-info {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1 class="game-title">Adaptive Maze Escape</h1>
+    <p class="game-subtitle">Navigate through an intelligent maze that adapts to your movement patterns!</p>
+    
+    <div class="main-container">
+        <div class="game-container">
+            <div class="controls-container">
+                <div class="controls">
+                    Use <span class="key">←</span> <span class="key">↑</span> <span class="key">↓</span> <span class="key">→</span> keys to navigate the maze
+                </div>
+            </div>
+            
+            <div class="canvas-container">
+                <canvas id="gameCanvas"></canvas>
+                <div id="message" class="message"></div>
+                
+                <div class="stats-container">
+                    <div class="stat-item">
+                        <span class="stat-label">Health</span>
+                        <span id="health-value" class="stat-value health-value">100</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Score</span>
+                        <span id="score-value" class="stat-value score-value">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Level</span>
+                        <span id="level-value" class="stat-value level-value">1</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>How to Play</h3>
+            <p>Navigate through the maze to reach the green exit while avoiding enemies and collecting power-ups!</p>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color player-color"></div>
+                    <span>Blue Circle: Your character</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color exit-color"></div>
+                    <span>Green Square: Exit</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color enemy-color"></div>
+                    <span>Orange Squares: Enemies</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color health-color"></div>
+                    <span>Red Circles: Health (+20)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color speed-color"></div>
+                    <span>Blue Circles: Score (+100)</span>
+                </div>
+            </div>
+            
+            <p class="game-tip"><strong>Pro Tip:</strong> The maze adapts to your movement patterns, and enemies learn from your behavior! Try to be unpredictable to avoid being trapped.</p>
+            
+            <div class="difficulty-info">
+                <h4>Game Mechanics</h4>
+                <ul>
+                    <li>Collect health powerups to restore your health (+20)</li>
+                    <li>Collect score powerups to increase your score (+100)</li>
+                    <li>Each movement gives you +1 score</li>
+                    <li>Enemies become more intelligent as you progress</li>
+                    <li>The maze walls will adapt to your movement patterns</li>
+                    <li>Difficulty increases with each level</li>
+                </ul>
+            </div>
+            
+            <div class="difficulty-info">
+                <h4>Adaptive AI</h4>
+                <p>This game features an intelligent maze that studies your movement patterns. If you tend to move in predictable ways, the maze will adapt to block your path!</p>
+                <p>Each enemy also has its own learning AI. The longer you play, the smarter they become at tracking you through the maze.</p>
+            </div>
+        </div>
+
+        <script src="index.js"></script>
+    </div>
+
