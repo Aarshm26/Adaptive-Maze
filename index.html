@@ -3,69 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vector Shift: Adaptive Escape</title>
+    <title>Protocol: ADAPT</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Google Font: Outfit for a modern, tech feel -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tech Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
 <body>
 
-    <!-- Main Game Container -->
-    <div class="game-wrapper">
-        
-        <!-- Header HUD -->
-        <header class="hud-glass">
-            <div class="brand">VECTOR <span class="accent">SHIFT</span></div>
-            <div class="stats-container">
-                <div class="stat-box">
-                    <i class="fas fa-heart icon-red"></i>
-                    <span id="ui-health">100</span>
+    <div class="scanlines"></div>
+    
+    <div class="main-interface">
+        <header class="hud-header">
+            <div class="logo-area">
+                <h1>PROTOCOL: <span class="highlight">ADAPT</span></h1>
+                <div class="subtitle">AI SURVIVAL SIMULATION // v1.0</div>
+            </div>
+            
+            <div class="hud-stats">
+                <div class="stat-unit">
+                    <div class="label">INTEGRITY</div>
+                    <div class="value health-color" id="health-value">100</div>
+                    <div class="bar-container"><div id="health-bar" class="bar-fill"></div></div>
                 </div>
-                <div class="stat-box">
-                    <i class="fas fa-bolt icon-blue"></i>
-                    <span id="ui-score">0</span>
+                <div class="stat-unit">
+                    <div class="label">DATA COLLECTED</div>
+                    <div class="value score-color" id="score-value">0</div>
                 </div>
-                <div class="stat-box">
-                    <i class="fas fa-layer-group icon-purple"></i>
-                    <span id="ui-level">1</span>
+                <div class="stat-unit">
+                    <div class="label">SECTOR</div>
+                    <div class="value level-color" id="level-value">1</div>
                 </div>
             </div>
         </header>
 
-        <!-- Canvas Layer -->
-        <div class="canvas-container">
+        <div class="canvas-wrapper">
+            <div class="corner-bracket top-left"></div>
+            <div class="corner-bracket top-right"></div>
+            <div class="corner-bracket bottom-left"></div>
+            <div class="corner-bracket bottom-right"></div>
+            
             <canvas id="gameCanvas"></canvas>
             
-            <!-- In-Game Notifications (Level Up / Warnings) -->
-            <div id="notification-overlay" class="notification hidden">
-                <h2 id="notif-title">LEVEL COMPLETE</h2>
-                <p id="notif-sub">System adapting...</p>
+            <div id="message-overlay" class="overlay hidden">
+                <div class="msg-box">
+                    <h2 id="msg-title">SYSTEM READY</h2>
+                    <p id="msg-text">INITIALIZING...</p>
+                </div>
             </div>
         </div>
 
-        <!-- Start / Game Over Screen -->
-        <div id="main-menu" class="menu-overlay">
-            <div class="glass-card">
-                <h1 id="menu-title">VECTOR SHIFT</h1>
-                <p id="menu-subtitle">The maze analyzes your patterns.<br>Be unpredictable.</p>
-                
-                <div class="info-grid">
-                    <div class="info-item"><div class="dot player"></div> You</div>
-                    <div class="info-item"><div class="dot enemy"></div> Hunter</div>
-                    <div class="info-item"><div class="dot exit"></div> Exit</div>
-                </div>
-
-                <button id="start-btn" class="primary-btn">INITIALIZE</button>
-                
-                <div class="controls-hint">
-                    <span><i class="fas fa-arrows-alt"></i> Arrow Keys / WASD / Swipe</span>
-                </div>
-            </div>
+        <div class="controls-legend">
+            <div class="key">WASD</div>
+            <div class="key">ARROWS</div>
+            <span class="instruction">NAVIGATE SECTOR</span>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="index.js"></script>
 </body>
 </html>
