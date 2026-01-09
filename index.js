@@ -1,4 +1,5 @@
-// Adaptive Maze Escape - Main Game Implementation
+// Adaptive Maze Escape - High Tech Version
+// index.js - Main game logic
 
 // Constants
 const CELL_SIZE = 40;
@@ -24,150 +25,142 @@ let gameState = {
 };
 
 let gameLoop;
-// Visual animation variable
-let animationFrame = 0; 
+let frameCount = 0; // For visual pulsing
 
-// --- MODIFIED RENDER FUNCTION (The "Cool" Part) ---
+// --- NEW RENDER FUNCTION (The Tech Reskin) ---
 function render() {
     const canvas = document.getElementById('gameCanvas');
+    if(!canvas) return;
     const ctx = canvas.getContext('2d');
-    
-    // Animation tick for pulsating effects
-    animationFrame++;
+    frameCount++;
 
-    // Calculate cell size dynamically
-    const container = document.querySelector('.canvas-wrapper');
-    const maxSize = Math.min(container.clientWidth - 20, 600);
-    const cellSize = maxSize / GRID_SIZE;
+    // Safety check: Don't render if maze isn't ready
+    if (!gameState.maze || gameState.maze.length === 0) return;
+
+    // 1. Calculate size dynamically to fit the new layout
+    const wrapper = document.querySelector('.canvas-wrapper');
+    // We want the largest square possible
+    const size = Math.min(wrapper.clientWidth, wrapper.clientHeight) - 40;
     
-    // Ensure canvas logical size matches display
-    if(canvas.width !== maxSize) {
-        canvas.width = maxSize;
-        canvas.height = maxSize;
+    // Update canvas resolution if changed
+    if (canvas.width !== size) {
+        canvas.width = size;
+        canvas.height = size;
     }
-
-    // Clear with a tech-grid background
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw subtle grid lines
-    ctx.strokeStyle = '#1e3a5f';
-    ctx.lineWidth = 0.5;
+    const cellSize = size / GRID_SIZE;
+
+    // 2. Clear Screen
+    ctx.fillStyle = '#050a10';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 3. Draw Grid Lines
+    ctx.strokeStyle = '#0f1f33';
+    ctx.lineWidth = 1;
     for(let i=0; i<=GRID_SIZE; i++) {
-        ctx.beginPath();
-        ctx.moveTo(i*cellSize, 0); ctx.lineTo(i*cellSize, canvas.height);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(0, i*cellSize); ctx.lineTo(canvas.width, i*cellSize);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(i*cellSize, 0); ctx.lineTo(i*cellSize, size); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i*cellSize); ctx.lineTo(size, i*cellSize); ctx.stroke();
     }
 
-    // Render Maze Elements
+    // 4. Render Maze Walls
     for (let y = 0; y < GRID_SIZE; y++) {
         for (let x = 0; x < GRID_SIZE; x++) {
             const cell = gameState.maze[y][x];
-            const px = x * cellSize;
-            const py = y * cellSize;
-
             if (cell.type === 'wall') {
-                // High-Tech Wall: Dark block with a cross
-                ctx.fillStyle = '#0f1f33';
-                ctx.fillRect(px + 2, py + 2, cellSize - 4, cellSize - 4);
+                const px = x * cellSize;
+                const py = y * cellSize;
                 
-                ctx.strokeStyle = '#2a4d7d';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(px + 6, py + 6, cellSize - 12, cellSize - 12);
+                // Tech Wall Style
+                ctx.fillStyle = '#112233';
+                ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
                 
-                // Tech Cross details
+                // Inner Detail
+                ctx.strokeStyle = '#1e3a5f';
+                ctx.strokeRect(px + 4, py + 4, cellSize - 8, cellSize - 8);
+                
+                // Crosshair
                 ctx.beginPath();
-                ctx.moveTo(px + 6, py + 6);
-                ctx.lineTo(px + 10, py + 10);
+                ctx.moveTo(px + 8, py + 8); ctx.lineTo(px + 12, py + 12);
+                ctx.moveTo(px + 12, py + 8); ctx.lineTo(px + 8, py + 12);
                 ctx.stroke();
             }
         }
     }
 
-    // Render Exit (Pulsing Green Target)
+    // 5. Render Exit (Pulsing Target)
     const ex = gameState.exit.x * cellSize + cellSize/2;
     const ey = gameState.exit.y * cellSize + cellSize/2;
-    const pulse = Math.sin(animationFrame * 0.1) * 5;
+    const pulse = Math.sin(frameCount * 0.1) * 3;
     
-    ctx.strokeStyle = '#00ff9d';
+    ctx.strokeStyle = '#00f0ff';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(ex, ey, (cellSize/3) + (pulse/2), 0, Math.PI*2);
+    ctx.arc(ex, ey, (cellSize/3) + pulse, 0, Math.PI*2);
     ctx.stroke();
-    
-    ctx.fillStyle = 'rgba(0, 255, 157, 0.2)';
-    ctx.beginPath();
-    ctx.arc(ex, ey, cellSize/4, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.2)';
     ctx.fill();
 
-    // Render Powerups
-    for (const powerup of gameState.powerups) {
-        const cx = powerup.x * cellSize + cellSize/2;
-        const cy = powerup.y * cellSize + cellSize/2;
-        
+    // 6. Render Powerups
+    for (const p of gameState.powerups) {
+        const cx = p.x * cellSize + cellSize/2;
+        const cy = p.y * cellSize + cellSize/2;
+        ctx.fillStyle = p.type === 'health' ? '#ff2a2a' : '#00ff9d';
         ctx.shadowBlur = 10;
-        if(powerup.type === 'health') {
-            ctx.fillStyle = '#ff2a2a';
-            ctx.shadowColor = '#ff2a2a';
-            // Cross shape
-            ctx.fillRect(cx - 2, cy - 8, 4, 16);
-            ctx.fillRect(cx - 8, cy - 2, 16, 4);
+        ctx.shadowColor = ctx.fillStyle;
+        
+        ctx.beginPath();
+        if(p.type === 'health') {
+            // Cross
+            ctx.fillRect(cx-3, cy-8, 6, 16);
+            ctx.fillRect(cx-8, cy-3, 16, 6);
         } else {
-            ctx.fillStyle = '#00f0ff';
-            ctx.shadowColor = '#00f0ff';
-            // Bolt/Diamond shape
-            ctx.beginPath();
-            ctx.moveTo(cx, cy - 8);
-            ctx.lineTo(cx + 8, cy);
-            ctx.lineTo(cx, cy + 8);
-            ctx.lineTo(cx - 8, cy);
+            // Diamond
+            ctx.moveTo(cx, cy-8); ctx.lineTo(cx+8, cy); 
+            ctx.lineTo(cx, cy+8); ctx.lineTo(cx-8, cy);
             ctx.fill();
         }
         ctx.shadowBlur = 0;
     }
 
-    // Render Enemies (Glitched Squares)
+    // 7. Render Enemies (Diamonds)
     for (const enemy of gameState.enemies) {
-        const ex = enemy.x * cellSize + cellSize * 0.15;
-        const ey = enemy.y * cellSize + cellSize * 0.15;
-        const size = cellSize * 0.7;
+        const enX = enemy.x * cellSize + cellSize/2;
+        const enY = enemy.y * cellSize + cellSize/2;
         
-        ctx.fillStyle = '#ffae00'; // Warning Orange
+        ctx.fillStyle = '#ffae00';
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#ffae00';
-        ctx.fillRect(ex, ey, size, size);
-        ctx.shadowBlur = 0;
         
-        // "Eye"
-        ctx.fillStyle = '#000';
-        ctx.fillRect(ex + size/2 - 2, ey + size/2 - 2, 4, 4);
+        ctx.beginPath();
+        ctx.moveTo(enX, enY - cellSize/2.5);
+        ctx.lineTo(enX + cellSize/2.5, enY);
+        ctx.lineTo(enX, enY + cellSize/2.5);
+        ctx.lineTo(enX - cellSize/2.5, enY);
+        ctx.fill();
+        ctx.shadowBlur = 0;
     }
 
-    // Render Player (Tech Core)
-    const px = gameState.player.x * cellSize + cellSize/2;
-    const py = gameState.player.y * cellSize + cellSize/2;
+    // 8. Render Player (Blue Core)
+    const plX = gameState.player.x * cellSize + cellSize/2;
+    const plY = gameState.player.y * cellSize + cellSize/2;
     
-    ctx.fillStyle = '#00f0ff';
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = '#00f0ff';
+    ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(px, py, cellSize/3.5, 0, Math.PI*2);
+    ctx.arc(plX, plY, cellSize/4, 0, Math.PI*2);
     ctx.fill();
-    ctx.shadowBlur = 0;
     
-    // Rotating Ring around player
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = '#00f0ff';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(px, py, cellSize/2.5, animationFrame*0.1, animationFrame*0.1 + Math.PI);
+    ctx.arc(plX, plY, cellSize/2.5, 0, Math.PI*2);
     ctx.stroke();
 
-    requestAnimationFrame(() => {}); // Keep visuals alive if needed, though game loop drives physics
+    // Keep animating visuals
+    requestAnimationFrame(render);
 }
 
-// --- LOGIC FUNCTIONS (Kept Exact, just updated UI targets) ---
+// --- YOUR ORIGINAL LOGIC FUNCTIONS BELOW ---
+// (Only updateUI and showMessage changed to match new HTML)
 
 function initGame() {
     if (gameState.won) {
@@ -190,25 +183,21 @@ function initGame() {
     gameState.won = false;
     gameState.tickCount = 0;
     
-    if (gameLoop) { clearInterval(gameLoop); }
+    if (gameLoop) clearInterval(gameLoop);
     gameLoop = setInterval(update, 100);
     
     updateUI();
-    render();
+    // Render loop is handled by requestAnimationFrame in the render function itself now
 }
 
 window.onload = function() {
-    // Initial UI Setup
-    document.getElementById('msg-text').textContent = "PRESS ANY KEY TO START";
-    document.getElementById('message-overlay').classList.remove('hidden');
+    // Auto-start immediately to fix the "blank screen" issue
+    initGame();
+    render(); // Kick off the render loop
     
-    window.addEventListener('keydown', function startOnce() {
-        document.getElementById('message-overlay').classList.add('hidden');
-        initGame();
-        window.removeEventListener('keydown', startOnce);
+    window.addEventListener('resize', () => {
+        // Render handles resizing automatically now
     });
-    
-    window.addEventListener('resize', render);
 };
 
 function generateMaze() {
@@ -238,7 +227,7 @@ function ensurePathExists(start, end) {
     
     while (queue.length > 0) {
         const current = queue.shift();
-        if (current.x === end.x && current.y === end.y) { return true; }
+        if (current.x === end.x && current.y === end.y) return true;
         
         const directions = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
         for (const dir of directions) {
@@ -254,13 +243,16 @@ function ensurePathExists(start, end) {
     }
     
     const path = carvePath(start, end);
-    for (const point of path) { gameState.maze[point.y][point.x].type = 'empty'; }
+    for (const point of path) {
+        gameState.maze[point.y][point.x].type = 'empty';
+    }
     return true;
 }
 
 function carvePath(start, end) {
     const path = [];
-    let x = start.x; let y = start.y;
+    let x = start.x;
+    let y = start.y;
     while (x !== end.x || y !== end.y) {
         path.push({ x, y });
         if (x < end.x && Math.random() < 0.5) x++;
@@ -317,20 +309,18 @@ function update() {
     
     if (gameState.player.x === gameState.exit.x && gameState.player.y === gameState.exit.y) {
         gameState.won = true;
-        showMessage("SECTOR CLEARED. INITIALIZING NEXT LEVEL...");
+        showMessage("SECTOR SECURED. PROCEEDING...");
         updateUI();
         setTimeout(() => { initGame(); }, 2000);
     }
     
-    if (gameState.tickCount % 10 === 0) { adaptMaze(); }
-    render();
+    if (gameState.tickCount % 10 === 0) adaptMaze();
 }
 
 function aStarPathfinding(start, end) {
     const openList = [];
     const closedList = [];
     const heuristic = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-    
     openList.push({ x: start.x, y: start.y, g: 0, h: heuristic(start, end), f: heuristic(start, end), parent: null });
     
     while (openList.length > 0) {
@@ -352,7 +342,6 @@ function aStarPathfinding(start, end) {
         for (const dir of directions) {
             const nx = current.x + dir.dx;
             const ny = current.y + dir.dy;
-            
             if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE || gameState.maze[ny][nx].type === 'wall') continue;
             if (closedList.some(node => node.x === nx && node.y === ny)) continue;
             
@@ -389,7 +378,6 @@ function moveEnemies() {
                 enemy.y = nextStep.y;
                 enemy.lastMove = { x: dx, y: dy };
             } else {
-                // Fallback logic kept identical to provided code
                 const dx = Math.sign(gameState.player.x - enemy.x);
                 const dy = Math.sign(gameState.player.y - enemy.y);
                 let moved = false;
@@ -435,7 +423,7 @@ function checkEnemyCollisions() {
             updateUI();
             if (gameState.player.health <= 0) {
                 gameState.gameOver = true;
-                showMessage("CRITICAL FAILURE. SUBJECT TERMINATED.");
+                showMessage("CRITICAL FAILURE. REBOOTING...");
                 setTimeout(() => { initGame(); }, 3000);
             }
         }
@@ -448,7 +436,7 @@ function checkPowerupCollection() {
         if (powerup.x === gameState.player.x && powerup.y === gameState.player.y) {
             if (powerup.type === 'health') {
                 gameState.player.health = Math.min(100, gameState.player.health + 20);
-                // No text popup, rely on bar update
+                // Visual feedback only
             } else if (powerup.type === 'speed') {
                 gameState.player.score += 100;
             }
@@ -465,19 +453,20 @@ function adaptMaze() {
             if (x === 0 || y === 0 || x === GRID_SIZE - 1 || y === GRID_SIZE - 1 ||
                 (x === gameState.player.x && y === gameState.player.y) ||
                 (x === gameState.exit.x && y === gameState.exit.y)) { continue; }
-            
             const distToPlayer = Math.abs(x - gameState.player.x) + Math.abs(y - gameState.player.y);
             if (distToPlayer < 3) continue;
-            
             if (Math.random() < gameState.maze[y][x].adaptability * ADAPTATION_RATE) {
                 const recentMoves = gameState.playerHistory.slice(-5);
                 const horizontalMoves = recentMoves.filter(move => Math.abs(move.dx) > Math.abs(move.dy)).length;
                 const verticalMoves = recentMoves.length - horizontalMoves;
                 const playerDirection = horizontalMoves > verticalMoves ? 'horizontal' : 'vertical';
                 let shouldBeWall;
-                if (playerDirection === 'horizontal' && y % 2 === 0) { shouldBeWall = Math.random() < 0.7; } 
-                else if (playerDirection === 'vertical' && x % 2 === 0) { shouldBeWall = Math.random() < 0.7; } 
-                else { shouldBeWall = Math.random() < 0.3; }
+                if (playerDirection === 'horizontal' && y % 2 === 0) shouldBeWall = Math.random() < 0.7;
+                else if (playerDirection === 'vertical' && x % 2 === 0) shouldBeWall = Math.random() < 0.7;
+                else shouldBeWall = Math.random() < 0.3;
+                
+                const newMaze = JSON.parse(JSON.stringify(gameState.maze));
+                newMaze[y][x].type = shouldBeWall ? 'wall' : 'empty';
                 
                 if (!shouldBeWall || pathExistsWithChange(gameState.player, gameState.exit, { x, y, type: 'wall' })) {
                     gameState.maze[y][x].type = shouldBeWall ? 'wall' : 'empty';
@@ -503,7 +492,7 @@ function pathExistsWithChange(start, end, change) {
     visited[start.y][start.x] = true;
     while (queue.length > 0) {
         const current = queue.shift();
-        if (current.x === end.x && current.y === end.y) { return true; }
+        if (current.x === end.x && current.y === end.y) return true;
         const directions = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
         for (const dir of directions) {
             const nx = current.x + dir.dx;
@@ -539,50 +528,42 @@ function movePlayer(dx, dy) {
         gameState.player.x = newX;
         gameState.player.y = newY;
         gameState.playerHistory.push({ dx, dy });
-        if (gameState.playerHistory.length > 20) { gameState.playerHistory.shift(); }
+        if (gameState.playerHistory.length > 20) gameState.playerHistory.shift();
         gameState.player.score += 1;
         checkPowerupCollection();
         updateUI();
         if (gameState.player.x === gameState.exit.x && gameState.player.y === gameState.exit.y) {
             gameState.won = true;
-            showMessage("SECTOR CLEARED. UPLOADING...");
+            showMessage("SECTOR SECURED. UPLOADING...");
             updateUI();
             setTimeout(() => { initGame(); }, 2000);
         }
     }
 }
 
-// Updated UI function to target new DOM structure
 function updateUI() {
     document.getElementById('health-value').textContent = gameState.player.health;
-    document.getElementById('health-bar').style.width = gameState.player.health + '%';
+    const hpBar = document.getElementById('health-bar');
+    if(hpBar) hpBar.style.width = gameState.player.health + '%';
+    
     document.getElementById('score-value').textContent = gameState.player.score;
     document.getElementById('level-value').textContent = gameState.level;
 }
 
 function showMessage(text) {
-    const msgOverlay = document.getElementById('message-overlay');
-    const msgTitle = document.getElementById('msg-title');
-    const msgText = document.getElementById('msg-text');
-    
-    msgTitle.textContent = "SYSTEM ALERT";
-    msgText.textContent = text;
-    msgOverlay.classList.remove('hidden');
-    
-    // Don't auto-hide Game Over messages, only transient ones
-    if (!gameState.gameOver && !gameState.won) {
-        setTimeout(() => { msgOverlay.classList.add('hidden'); }, 1500);
-    }
+    const msg = document.getElementById('message');
+    msg.textContent = text;
+    msg.classList.remove('hidden');
+    setTimeout(() => { msg.classList.add('hidden'); }, 1500);
 }
 
 document.addEventListener('keydown', (e) => {
     if (gameState.gameOver || gameState.won) return;
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.key)) { e.preventDefault(); }
     switch (e.key) {
-        case 'ArrowUp': case 'w': case 'W': movePlayer(0, -1); break;
-        case 'ArrowRight': case 'd': case 'D': movePlayer(1, 0); break;
-        case 'ArrowDown': case 's': case 'S': movePlayer(0, 1); break;
-        case 'ArrowLeft': case 'a': case 'A': movePlayer(-1, 0); break;
+        case 'ArrowUp': movePlayer(0, -1); break;
+        case 'ArrowRight': movePlayer(1, 0); break;
+        case 'ArrowDown': movePlayer(0, 1); break;
+        case 'ArrowLeft': movePlayer(-1, 0); break;
     }
-    render();
 });
