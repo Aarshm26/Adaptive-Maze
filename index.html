@@ -3,30 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Protocol: ADAPT</title>
+    <title>PROTOCOL: ADAPT</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Tech Font -->
+    <!-- Sci-Fi Font -->
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
 <body>
 
+    <!-- CRT Screen Effect Overlay -->
     <div class="scanlines"></div>
     
     <div class="main-interface">
         <header class="hud-header">
             <div class="logo-area">
                 <h1>PROTOCOL: <span class="highlight">ADAPT</span></h1>
-                <div class="subtitle">AI SURVIVAL SIMULATION // v1.0</div>
+                <div class="subtitle">AI SURVIVAL SIMULATION // v2.0</div>
             </div>
             
             <div class="hud-stats">
                 <div class="stat-unit">
                     <div class="label">INTEGRITY</div>
                     <div class="value health-color" id="health-value">100</div>
-                    <div class="bar-container"><div id="health-bar" class="bar-fill"></div></div>
+                    <div class="bar-bg"><div id="health-bar" class="bar-fill"></div></div>
                 </div>
                 <div class="stat-unit">
-                    <div class="label">DATA COLLECTED</div>
+                    <div class="label">DATA</div>
                     <div class="value score-color" id="score-value">0</div>
                 </div>
                 <div class="stat-unit">
@@ -36,7 +37,9 @@
             </div>
         </header>
 
+        <!-- The Game Area -->
         <div class="canvas-wrapper">
+            <!-- Decorative Tech Brackets -->
             <div class="corner-bracket top-left"></div>
             <div class="corner-bracket top-right"></div>
             <div class="corner-bracket bottom-left"></div>
@@ -44,18 +47,13 @@
             
             <canvas id="gameCanvas"></canvas>
             
-            <div id="message-overlay" class="overlay hidden">
-                <div class="msg-box">
-                    <h2 id="msg-title">SYSTEM READY</h2>
-                    <p id="msg-text">INITIALIZING...</p>
-                </div>
-            </div>
+            <!-- Message Overlay -->
+            <div id="message" class="message-overlay hidden">SYSTEM READY</div>
         </div>
 
         <div class="controls-legend">
-            <div class="key">WASD</div>
-            <div class="key">ARROWS</div>
-            <span class="instruction">NAVIGATE SECTOR</span>
+            <span class="key">WASD / ARROWS</span>
+            <span class="instruction">TO NAVIGATE</span>
         </div>
     </div>
 
