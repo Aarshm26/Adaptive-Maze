@@ -1,529 +1,588 @@
-/**
- * VECTOR SHIFT - Core Logic
- * Featuring A* Pathfinding, Smooth LERP Movement, and Adaptive Grids
- */
+// Adaptive Maze Escape - Main Game Implementation
 
-const CFG = {
-    GRID_SIZE: 15,
-    WALL_CHANCE: 0.25,
-    PLAYER_SPEED: 0.2, // Visual lerp speed (0-1)
-    ENEMY_SPEED: 0.08, // Visual lerp speed
-    COLORS: {
-        wall: '#1e293b',
-        floor: '#0f172a',
-        player: '#38bdf8',
-        enemy: '#f43f5e',
-        exit: '#10b981',
-        health: '#f43f5e',
-        score: '#fbbf24'
-    }
+// Constants
+const CELL_SIZE = 40;
+const GRID_SIZE = 15;
+const WALL_CHANCE = 0.3;
+const POWERUP_CHANCE = 0.05;
+const ENEMY_COUNT = 2;
+const ADAPTATION_RATE = 0.15; 
+
+// Game state
+let gameState = {
+    player: { x: 1, y: 1, health: 100, score: 0 },
+    exit: { x: GRID_SIZE - 2, y: GRID_SIZE - 2 },
+    enemies: [],
+    powerups: [],
+    maze: [],
+    playerHistory: [],
+    difficultyLevel: 1,
+    level: 1,
+    gameOver: false,
+    won: false,
+    tickCount: 0
 };
 
-// --- UTILITY CLASS ---
-class Utils {
-    static lerp(start, end, t) {
-        return start * (1 - t) + end * t;
-    }
-    static dist(a, b) {
-        return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
-    }
-}
+let gameLoop;
+// Visual animation variable
+let animationFrame = 0; 
 
-// --- PARTICLE SYSTEM ---
-class Particle {
-    constructor(x, y, color) {
-        this.x = x; this.y = y;
-        this.color = color;
-        this.size = Math.random() * 4 + 2;
-        this.vx = (Math.random() - 0.5) * 5;
-        this.vy = (Math.random() - 0.5) * 5;
-        this.life = 1.0;
+// --- MODIFIED RENDER FUNCTION (The "Cool" Part) ---
+function render() {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Animation tick for pulsating effects
+    animationFrame++;
+
+    // Calculate cell size dynamically
+    const container = document.querySelector('.canvas-wrapper');
+    const maxSize = Math.min(container.clientWidth - 20, 600);
+    const cellSize = maxSize / GRID_SIZE;
+    
+    // Ensure canvas logical size matches display
+    if(canvas.width !== maxSize) {
+        canvas.width = maxSize;
+        canvas.height = maxSize;
     }
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.life -= 0.04;
-        this.size *= 0.95;
-    }
-    draw(ctx, cs) {
-        ctx.globalAlpha = this.life;
-        ctx.fillStyle = this.color;
+
+    // Clear with a tech-grid background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw subtle grid lines
+    ctx.strokeStyle = '#1e3a5f';
+    ctx.lineWidth = 0.5;
+    for(let i=0; i<=GRID_SIZE; i++) {
         ctx.beginPath();
-        ctx.arc(this.x * cs, this.y * cs, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
+        ctx.moveTo(i*cellSize, 0); ctx.lineTo(i*cellSize, canvas.height);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i*cellSize); ctx.lineTo(canvas.width, i*cellSize);
+        ctx.stroke();
     }
+
+    // Render Maze Elements
+    for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+            const cell = gameState.maze[y][x];
+            const px = x * cellSize;
+            const py = y * cellSize;
+
+            if (cell.type === 'wall') {
+                // High-Tech Wall: Dark block with a cross
+                ctx.fillStyle = '#0f1f33';
+                ctx.fillRect(px + 2, py + 2, cellSize - 4, cellSize - 4);
+                
+                ctx.strokeStyle = '#2a4d7d';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(px + 6, py + 6, cellSize - 12, cellSize - 12);
+                
+                // Tech Cross details
+                ctx.beginPath();
+                ctx.moveTo(px + 6, py + 6);
+                ctx.lineTo(px + 10, py + 10);
+                ctx.stroke();
+            }
+        }
+    }
+
+    // Render Exit (Pulsing Green Target)
+    const ex = gameState.exit.x * cellSize + cellSize/2;
+    const ey = gameState.exit.y * cellSize + cellSize/2;
+    const pulse = Math.sin(animationFrame * 0.1) * 5;
+    
+    ctx.strokeStyle = '#00ff9d';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(ex, ey, (cellSize/3) + (pulse/2), 0, Math.PI*2);
+    ctx.stroke();
+    
+    ctx.fillStyle = 'rgba(0, 255, 157, 0.2)';
+    ctx.beginPath();
+    ctx.arc(ex, ey, cellSize/4, 0, Math.PI*2);
+    ctx.fill();
+
+    // Render Powerups
+    for (const powerup of gameState.powerups) {
+        const cx = powerup.x * cellSize + cellSize/2;
+        const cy = powerup.y * cellSize + cellSize/2;
+        
+        ctx.shadowBlur = 10;
+        if(powerup.type === 'health') {
+            ctx.fillStyle = '#ff2a2a';
+            ctx.shadowColor = '#ff2a2a';
+            // Cross shape
+            ctx.fillRect(cx - 2, cy - 8, 4, 16);
+            ctx.fillRect(cx - 8, cy - 2, 16, 4);
+        } else {
+            ctx.fillStyle = '#00f0ff';
+            ctx.shadowColor = '#00f0ff';
+            // Bolt/Diamond shape
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - 8);
+            ctx.lineTo(cx + 8, cy);
+            ctx.lineTo(cx, cy + 8);
+            ctx.lineTo(cx - 8, cy);
+            ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+    }
+
+    // Render Enemies (Glitched Squares)
+    for (const enemy of gameState.enemies) {
+        const ex = enemy.x * cellSize + cellSize * 0.15;
+        const ey = enemy.y * cellSize + cellSize * 0.15;
+        const size = cellSize * 0.7;
+        
+        ctx.fillStyle = '#ffae00'; // Warning Orange
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ffae00';
+        ctx.fillRect(ex, ey, size, size);
+        ctx.shadowBlur = 0;
+        
+        // "Eye"
+        ctx.fillStyle = '#000';
+        ctx.fillRect(ex + size/2 - 2, ey + size/2 - 2, 4, 4);
+    }
+
+    // Render Player (Tech Core)
+    const px = gameState.player.x * cellSize + cellSize/2;
+    const py = gameState.player.y * cellSize + cellSize/2;
+    
+    ctx.fillStyle = '#00f0ff';
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#00f0ff';
+    ctx.beginPath();
+    ctx.arc(px, py, cellSize/3.5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    
+    // Rotating Ring around player
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(px, py, cellSize/2.5, animationFrame*0.1, animationFrame*0.1 + Math.PI);
+    ctx.stroke();
+
+    requestAnimationFrame(() => {}); // Keep visuals alive if needed, though game loop drives physics
 }
 
-// --- GAME LOGIC ---
-class Game {
-    constructor() {
-        this.canvas = document.getElementById('gameCanvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.particles = [];
-        
-        // Logical State
-        this.grid = [];
-        this.player = { x: 1, y: 1, vx: 1, vy: 1, hp: 100, score: 0, iframe: 0 };
-        this.enemies = [];
-        this.items = [];
-        this.exit = { x: CFG.GRID_SIZE-2, y: CFG.GRID_SIZE-2 };
-        
-        this.level = 1;
-        this.running = false;
-        
-        // UI References
-        this.ui = {
-            menu: document.getElementById('main-menu'),
-            title: document.getElementById('menu-title'),
-            sub: document.getElementById('menu-subtitle'),
-            btn: document.getElementById('start-btn'),
-            notif: document.getElementById('notification-overlay'),
-            hp: document.getElementById('ui-health'),
-            score: document.getElementById('ui-score'),
-            lvl: document.getElementById('ui-level')
-        };
+// --- LOGIC FUNCTIONS (Kept Exact, just updated UI targets) ---
 
-        this.resize();
-        window.addEventListener('resize', () => this.resize());
-        this.setupInputs();
-        
-        this.ui.btn.addEventListener('click', () => this.startGame());
-        
-        // Game Loop
-        const loop = () => {
-            if(this.running) this.update();
-            this.draw();
-            requestAnimationFrame(loop);
-        };
-        requestAnimationFrame(loop);
+function initGame() {
+    if (gameState.won) {
+        gameState.level++;
+        gameState.difficultyLevel += 0.5;
+    } else if (gameState.gameOver) {
+        gameState.difficultyLevel = 1;
+        gameState.level = 1;
     }
+    
+    generateMaze();
+    gameState.player = { x: 1, y: 1, health: 100, score: gameState.won ? gameState.player.score : 0 };
+    gameState.exit = { x: GRID_SIZE - 2, y: GRID_SIZE - 2 };
+    ensurePathExists(gameState.player, gameState.exit);
+    spawnEnemies();
+    spawnPowerups();
+    
+    gameState.playerHistory = [];
+    gameState.gameOver = false;
+    gameState.won = false;
+    gameState.tickCount = 0;
+    
+    if (gameLoop) { clearInterval(gameLoop); }
+    gameLoop = setInterval(update, 100);
+    
+    updateUI();
+    render();
+}
 
-    resize() {
-        // Calculate square size based on container
-        const container = this.canvas.parentElement;
-        const size = Math.min(container.clientWidth, container.clientHeight);
-        this.canvas.width = size;
-        this.canvas.height = size;
-        this.cellSize = size / CFG.GRID_SIZE;
+window.onload = function() {
+    // Initial UI Setup
+    document.getElementById('msg-text').textContent = "PRESS ANY KEY TO START";
+    document.getElementById('message-overlay').classList.remove('hidden');
+    
+    window.addEventListener('keydown', function startOnce() {
+        document.getElementById('message-overlay').classList.add('hidden');
+        initGame();
+        window.removeEventListener('keydown', startOnce);
+    });
+    
+    window.addEventListener('resize', render);
+};
+
+function generateMaze() {
+    gameState.maze = [];
+    for (let y = 0; y < GRID_SIZE; y++) {
+        const row = [];
+        for (let x = 0; x < GRID_SIZE; x++) {
+            if (x === 0 || y === 0 || x === GRID_SIZE - 1 || y === GRID_SIZE - 1) {
+                row.push({ type: 'wall', adaptability: 0 });
+            } else {
+                row.push({ 
+                    type: Math.random() < WALL_CHANCE ? 'wall' : 'empty',
+                    adaptability: Math.random()
+                });
+            }
+        }
+        gameState.maze.push(row);
     }
+    gameState.maze[1][1].type = 'empty';
+    gameState.maze[GRID_SIZE - 2][GRID_SIZE - 2].type = 'empty';
+}
 
-    // --- GENERATION ---
-    generateMaze() {
-        this.grid = [];
-        for(let y=0; y<CFG.GRID_SIZE; y++) {
-            let row = [];
-            for(let x=0; x<CFG.GRID_SIZE; x++) {
-                // Borders are walls
-                if(x===0 || y===0 || x===CFG.GRID_SIZE-1 || y===CFG.GRID_SIZE-1) {
-                    row.push({ type: 'wall', scale: 1 });
-                } else {
-                    row.push({ 
-                        type: Math.random() < CFG.WALL_CHANCE ? 'wall' : 'floor',
-                        scale: 0 // For animation
-                    });
+function ensurePathExists(start, end) {
+    const visited = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false));
+    const queue = [{ x: start.x, y: start.y, path: [] }];
+    visited[start.y][start.x] = true;
+    
+    while (queue.length > 0) {
+        const current = queue.shift();
+        if (current.x === end.x && current.y === end.y) { return true; }
+        
+        const directions = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
+        for (const dir of directions) {
+            const nx = current.x + dir.dx;
+            const ny = current.y + dir.dy;
+            if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && !visited[ny][nx]) {
+                if (gameState.maze[ny][nx].type === 'empty' || (nx === end.x && ny === end.y)) {
+                    visited[ny][nx] = true;
+                    queue.push({ x: nx, y: ny, path: [...current.path, { x: nx, y: ny }] });
                 }
             }
-            this.grid.push(row);
         }
-        
-        // Clear Start and Exit
-        this.grid[1][1].type = 'floor';
-        this.grid[this.exit.y][this.exit.x].type = 'floor';
-        
-        // Ensure path exists (Flood Fill check could go here, but brute force regen is simpler for this scale)
-        if(!this.pathExists({x:1,y:1}, this.exit)) this.generateMaze();
     }
+    
+    const path = carvePath(start, end);
+    for (const point of path) { gameState.maze[point.y][point.x].type = 'empty'; }
+    return true;
+}
 
-    pathExists(start, end) {
-        // Simple BFS to check connectivity
-        let q = [start];
-        let visited = new Set();
-        visited.add(`${start.x},${start.y}`);
-        
-        while(q.length) {
-            let curr = q.shift();
-            if(curr.x === end.x && curr.y === end.y) return true;
-            
-            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
-                let nx = curr.x+dx, ny = curr.y+dy;
-                if(nx>0 && ny>0 && nx<CFG.GRID_SIZE-1 && ny<CFG.GRID_SIZE-1) {
-                    if(this.grid[ny][nx].type !== 'wall' && !visited.has(`${nx},${ny}`)) {
-                        visited.add(`${nx},${ny}`);
-                        q.push({x:nx, y:ny});
-                    }
-                }
-            });
-        }
-        return false;
+function carvePath(start, end) {
+    const path = [];
+    let x = start.x; let y = start.y;
+    while (x !== end.x || y !== end.y) {
+        path.push({ x, y });
+        if (x < end.x && Math.random() < 0.5) x++;
+        else if (x > end.x && Math.random() < 0.5) x--;
+        else if (y < end.y) y++;
+        else if (y > end.y) y--;
     }
+    path.push(end);
+    return path;
+}
 
-    // --- INPUTS ---
-    setupInputs() {
-        const move = (dx, dy) => {
-            if(!this.running) return;
-            const nx = this.player.x + dx;
-            const ny = this.player.y + dy;
-            if(this.grid[ny][nx].type !== 'wall') {
-                this.player.x = nx;
-                this.player.y = ny;
-                this.player.score++;
-                this.updateUI();
-                this.adaptMaze(); // Trigger adaptation logic
-            }
-        };
-
-        window.addEventListener('keydown', e => {
-            if(['ArrowUp','w'].includes(e.key)) move(0, -1);
-            if(['ArrowDown','s'].includes(e.key)) move(0, 1);
-            if(['ArrowLeft','a'].includes(e.key)) move(-1, 0);
-            if(['ArrowRight','d'].includes(e.key)) move(1, 0);
-        });
-
-        // Simple Swipe for mobile
-        let tsX, tsY;
-        this.canvas.addEventListener('touchstart', e => {
-            tsx = e.touches[0].clientX;
-            tsy = e.touches[0].clientY;
-        });
-        this.canvas.addEventListener('touchend', e => {
-            let dx = e.changedTouches[0].clientX - tsx;
-            let dy = e.changedTouches[0].clientY - tsy;
-            if(Math.abs(dx) > Math.abs(dy)) move(dx>0?1:-1, 0);
-            else move(0, dy>0?1:-1);
-        });
-    }
-
-    // --- GAMEPLAY CONTROL ---
-    startGame() {
-        this.ui.menu.classList.add('hidden');
-        this.player.score = 0;
-        this.player.hp = 100;
-        this.level = 1;
-        this.running = true;
-        this.startLevel();
-    }
-
-    startLevel() {
-        this.exit = { x: CFG.GRID_SIZE-2, y: CFG.GRID_SIZE-2 };
-        this.generateMaze();
-        this.player.x = 1; this.player.y = 1;
-        this.player.vx = 1; this.player.vy = 1; // Reset visuals
-        
-        // Spawn Enemies
-        this.enemies = [];
-        let enemyCount = 1 + Math.floor(this.level / 2);
-        for(let i=0; i<enemyCount; i++) this.spawnEntity('enemy');
-        
-        // Spawn Items
-        this.items = [];
-        for(let i=0; i<3; i++) this.spawnEntity('item');
-        
-        this.updateUI();
-    }
-
-    spawnEntity(type) {
+function spawnEnemies() {
+    gameState.enemies = [];
+    for (let i = 0; i < ENEMY_COUNT; i++) {
         let x, y;
         do {
-            x = Math.floor(Math.random()*(CFG.GRID_SIZE-2))+1;
-            y = Math.floor(Math.random()*(CFG.GRID_SIZE-2))+1;
-        } while(this.grid[y][x].type === 'wall' || (x===1 && y===1));
-        
-        if(type === 'enemy') {
-            this.enemies.push({ x, y, vx: x, vy: y, timer: 0 });
-        } else {
-            this.items.push({ x, y, type: Math.random()>0.5 ? 'hp' : 'score' });
-        }
-    }
-
-    // --- UPDATE LOOP ---
-    update() {
-        // 1. Smooth Movement (LERP)
-        this.player.vx = Utils.lerp(this.player.vx, this.player.x, CFG.PLAYER_SPEED);
-        this.player.vy = Utils.lerp(this.player.vy, this.player.y, CFG.PLAYER_SPEED);
-
-        // 2. Wall Animation
-        for(let row of this.grid) {
-            for(let cell of row) {
-                if(cell.type === 'wall' && cell.scale < 1) cell.scale += 0.1;
-            }
-        }
-
-        // 3. Enemies
-        this.enemies.forEach(en => {
-            // Visual Lerp
-            en.vx = Utils.lerp(en.vx, en.x, CFG.ENEMY_SPEED);
-            en.vy = Utils.lerp(en.vy, en.y, CFG.ENEMY_SPEED);
-            
-            // AI Logic (Move every 60 frames approx)
-            en.timer++;
-            if(en.timer > 50 - (this.level * 2)) { 
-                en.timer = 0;
-                this.moveEnemy(en);
-            }
-            
-            // Collision with Player
-            let dist = Utils.dist({x:en.vx, y:en.vy}, {x:this.player.vx, y:this.player.vy});
-            if(dist < 0.6 && this.player.iframe <= 0) {
-                this.hitPlayer();
-            }
+            x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+            y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+        } while (
+            (x === gameState.player.x && y === gameState.player.y) ||
+            (x === gameState.exit.x && y === gameState.exit.y) ||
+            gameState.maze[y][x].type === 'wall'
+        );
+        gameState.enemies.push({
+            x, y,
+            intelligence: 0.2 + (Math.random() * 0.3 * gameState.difficultyLevel),
+            lastMove: { x: 0, y: 0 },
+            path: []
         });
-
-        if(this.player.iframe > 0) this.player.iframe--;
-
-        // 4. Items
-        for(let i = this.items.length-1; i>=0; i--) {
-            let it = this.items[i];
-            let dist = Utils.dist({x:it.x, y:it.y}, {x:this.player.vx, y:this.player.vy});
-            if(dist < 0.5) {
-                this.collectItem(it);
-                this.items.splice(i, 1);
-            }
-        }
-
-        // 5. Exit
-        if(this.player.x === this.exit.x && this.player.y === this.exit.y) {
-            this.levelUp();
-        }
-
-        // 6. Particles
-        this.particles.forEach((p, i) => {
-            p.update();
-            if(p.life <= 0) this.particles.splice(i, 1);
-        });
-    }
-
-    moveEnemy(enemy) {
-        // A* Pathfinding (Simplified)
-        // Find next step towards player
-        let path = this.findPath({x:enemy.x, y:enemy.y}, {x:this.player.x, y:this.player.y});
-        if(path && path.length > 1) {
-            enemy.x = path[1].x;
-            enemy.y = path[1].y;
-        }
-    }
-
-    findPath(start, end) {
-        // Standard A* implementation
-        let open = [start], closed = [], cameFrom = {}, gScore = {}, fScore = {};
-        const k = n => `${n.x},${n.y}`;
-        gScore[k(start)] = 0;
-        fScore[k(start)] = Utils.dist(start, end);
-        
-        while(open.length) {
-            let curr = open.reduce((a,b) => fScore[k(a)] < fScore[k(b)] ? a : b);
-            if(curr.x === end.x && curr.y === end.y) {
-                let path = [curr];
-                while(k(curr) in cameFrom) { curr = cameFrom[k(curr)]; path.push(curr); }
-                return path.reverse();
-            }
-            open = open.filter(n => n!==curr);
-            closed.push(curr);
-            
-            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
-                let nx = curr.x+dx, ny = curr.y+dy;
-                if(nx<1 || ny<1 || nx>=CFG.GRID_SIZE-1 || ny>=CFG.GRID_SIZE-1) return;
-                if(this.grid[ny][nx].type === 'wall' || closed.some(c=>c.x===nx && c.y===ny)) return;
-                
-                let tentativeG = gScore[k(curr)] + 1;
-                if(!open.some(o=>o.x===nx && o.y===ny)) open.push({x:nx, y:ny});
-                else if(tentativeG >= gScore[k({x:nx,y:ny})]) return;
-                
-                cameFrom[k({x:nx,y:ny})] = curr;
-                gScore[k({x:nx,y:ny})] = tentativeG;
-                fScore[k({x:nx,y:ny})] = tentativeG + Utils.dist({x:nx,y:ny}, end);
-            });
-        }
-        return [];
-    }
-
-    hitPlayer() {
-        this.player.hp -= 20;
-        this.player.iframe = 60; // 1 second invulnerability
-        this.spawnParticles(this.player.vx, this.player.vy, CFG.COLORS.health, 10);
-        this.updateUI();
-        
-        // Shake Effect
-        this.canvas.style.transform = `translate(${Math.random()*10-5}px, ${Math.random()*10-5}px)`;
-        setTimeout(() => this.canvas.style.transform = 'none', 200);
-
-        if(this.player.hp <= 0) this.gameOver();
-    }
-
-    collectItem(item) {
-        if(item.type === 'hp') {
-            this.player.hp = Math.min(100, this.player.hp + 20);
-            this.spawnParticles(item.x, item.y, CFG.COLORS.health, 8);
-        } else {
-            this.player.score += 50;
-            this.spawnParticles(item.x, item.y, CFG.COLORS.score, 8);
-        }
-        this.updateUI();
-    }
-
-    adaptMaze() {
-        // 10% chance to modify a block near player
-        if(Math.random() < 0.1) {
-            let rx = Math.floor(Math.random()*(CFG.GRID_SIZE-2))+1;
-            let ry = Math.floor(Math.random()*(CFG.GRID_SIZE-2))+1;
-            // Don't spawn on entities
-            if(Utils.dist({x:rx, y:ry}, this.player) > 2) {
-                if(this.grid[ry][rx].type === 'floor') {
-                    // Check if blocking creates unsolveable state (simplified)
-                    this.grid[ry][rx].type = 'wall';
-                    if(!this.pathExists(this.player, this.exit)) {
-                        this.grid[ry][rx].type = 'floor'; // Revert
-                    } else {
-                        this.grid[ry][rx].scale = 0; // Animate in
-                    }
-                }
-            }
-        }
-    }
-
-    levelUp() {
-        this.level++;
-        this.player.score += 100;
-        
-        // Show Toast Notification (No popup)
-        this.ui.notif.classList.remove('hidden');
-        document.getElementById('notif-title').innerText = `LEVEL ${this.level}`;
-        setTimeout(() => this.ui.notif.classList.add('hidden'), 2000);
-        
-        this.startLevel();
-    }
-
-    gameOver() {
-        this.running = false;
-        this.ui.menu.classList.remove('hidden');
-        this.ui.title.innerText = "CRITICAL FAILURE";
-        this.ui.sub.innerText = `Final Score: ${this.player.score}`;
-        this.ui.btn.innerText = "REBOOT SYSTEM";
-    }
-
-    updateUI() {
-        this.ui.hp.innerText = this.player.hp;
-        this.ui.score.innerText = this.player.score;
-        this.ui.lvl.innerText = this.level;
-    }
-
-    spawnParticles(gx, gy, color, count) {
-        for(let i=0; i<count; i++) {
-            this.particles.push(new Particle(gx, gy, color));
-        }
-    }
-
-    // --- RENDER ---
-    draw() {
-        // Clear background
-        this.ctx.fillStyle = CFG.COLORS.floor;
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        const cs = this.cellSize;
-
-        // Draw Grid Elements
-        for(let y=0; y<CFG.GRID_SIZE; y++) {
-            for(let x=0; x<CFG.GRID_SIZE; x++) {
-                let cell = this.grid[y][x];
-                let px = x * cs;
-                let py = y * cs;
-
-                if(cell.type === 'wall') {
-                    let size = cs * cell.scale;
-                    let offset = (cs - size) / 2;
-                    
-                    this.ctx.fillStyle = CFG.COLORS.wall;
-                    this.ctx.shadowBlur = 10;
-                    this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
-                    this.ctx.fillRect(px + offset, py + offset, size, size);
-                    this.ctx.shadowBlur = 0;
-                    
-                    // Top Highlight
-                    this.ctx.fillStyle = 'rgba(255,255,255,0.05)';
-                    this.ctx.fillRect(px + offset, py + offset, size, size/2);
-                } else {
-                    // Faint grid dots
-                    this.ctx.fillStyle = 'rgba(255,255,255,0.03)';
-                    this.ctx.fillRect(px + cs/2 - 1, py + cs/2 - 1, 2, 2);
-                }
-            }
-        }
-
-        // Draw Items
-        this.items.forEach(it => {
-            let cx = it.x * cs + cs/2;
-            let cy = it.y * cs + cs/2;
-            this.ctx.fillStyle = it.type === 'hp' ? CFG.COLORS.health : CFG.COLORS.score;
-            this.ctx.shadowBlur = 15;
-            this.ctx.shadowColor = this.ctx.fillStyle;
-            this.ctx.beginPath();
-            this.ctx.arc(cx, cy, cs/4, 0, Math.PI*2);
-            this.ctx.fill();
-            this.ctx.shadowBlur = 0;
-            
-            // Float animation
-            this.ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-            this.ctx.beginPath();
-            this.ctx.arc(cx, cy, (cs/3) + Math.sin(Date.now()/300)*2, 0, Math.PI*2);
-            this.ctx.stroke();
-        });
-
-        // Draw Exit
-        let ex = this.exit.x * cs + cs/2;
-        let ey = this.exit.y * cs + cs/2;
-        this.ctx.strokeStyle = CFG.COLORS.exit;
-        this.ctx.lineWidth = 3;
-        this.ctx.beginPath();
-        this.ctx.arc(ex, ey, cs/3, 0, Math.PI*2);
-        this.ctx.stroke();
-        // Pulsing center
-        this.ctx.fillStyle = CFG.COLORS.exit;
-        this.ctx.globalAlpha = 0.3 + Math.sin(Date.now()/200)*0.2;
-        this.ctx.beginPath();
-        this.ctx.arc(ex, ey, cs/4, 0, Math.PI*2);
-        this.ctx.fill();
-        this.ctx.globalAlpha = 1.0;
-
-        // Draw Player
-        let px = this.player.vx * cs + cs/2;
-        let py = this.player.vy * cs + cs/2;
-        
-        this.ctx.fillStyle = CFG.COLORS.player;
-        this.ctx.shadowBlur = 20;
-        this.ctx.shadowColor = CFG.COLORS.player;
-        this.ctx.beginPath();
-        this.ctx.arc(px, py, cs/3, 0, Math.PI*2);
-        this.ctx.fill();
-        this.ctx.shadowBlur = 0;
-        
-        if(this.player.iframe > 0 && Math.floor(Date.now()/50)%2===0) {
-            this.ctx.fillStyle = '#fff';
-            this.ctx.fill();
-        }
-
-        // Draw Enemies
-        this.enemies.forEach(en => {
-            let ex = en.vx * cs + cs/2;
-            let ey = en.vy * cs + cs/2;
-            
-            this.ctx.fillStyle = CFG.COLORS.enemy;
-            this.ctx.shadowBlur = 15;
-            this.ctx.shadowColor = CFG.COLORS.enemy;
-            
-            // Triangle shape for enemy
-            this.ctx.beginPath();
-            this.ctx.moveTo(ex, ey - cs/3);
-            this.ctx.lineTo(ex + cs/3, ey + cs/3);
-            this.ctx.lineTo(ex - cs/3, ey + cs/3);
-            this.ctx.closePath();
-            this.ctx.fill();
-            this.ctx.shadowBlur = 0;
-        });
-
-        // Draw Particles
-        this.particles.forEach(p => p.draw(this.ctx, cs));
     }
 }
 
-// Init
-window.onload = () => new Game();
+function spawnPowerups() {
+    gameState.powerups = [];
+    for (let y = 1; y < GRID_SIZE - 1; y++) {
+        for (let x = 1; x < GRID_SIZE - 1; x++) {
+            if (gameState.maze[y][x].type === 'empty' && Math.random() < POWERUP_CHANCE) {
+                if ((x !== gameState.player.x || y !== gameState.player.y) && 
+                    (x !== gameState.exit.x || y !== gameState.exit.y)) {
+                    const type = Math.random() < 0.5 ? 'health' : 'speed';
+                    gameState.powerups.push({ x, y, type });
+                }
+            }
+        }
+    }
+}
+
+function update() {
+    if (gameState.gameOver || gameState.won) return;
+    gameState.tickCount++;
+    moveEnemies();
+    checkEnemyCollisions();
+    checkPowerupCollection();
+    
+    if (gameState.player.x === gameState.exit.x && gameState.player.y === gameState.exit.y) {
+        gameState.won = true;
+        showMessage("SECTOR CLEARED. INITIALIZING NEXT LEVEL...");
+        updateUI();
+        setTimeout(() => { initGame(); }, 2000);
+    }
+    
+    if (gameState.tickCount % 10 === 0) { adaptMaze(); }
+    render();
+}
+
+function aStarPathfinding(start, end) {
+    const openList = [];
+    const closedList = [];
+    const heuristic = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    
+    openList.push({ x: start.x, y: start.y, g: 0, h: heuristic(start, end), f: heuristic(start, end), parent: null });
+    
+    while (openList.length > 0) {
+        openList.sort((a, b) => a.f - b.f);
+        const current = openList.shift();
+        closedList.push(current);
+        
+        if (current.x === end.x && current.y === end.y) {
+            const path = [];
+            let currentNode = current;
+            while (currentNode.parent) {
+                path.push({ x: currentNode.x, y: currentNode.y });
+                currentNode = currentNode.parent;
+            }
+            return path.reverse();
+        }
+        
+        const directions = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
+        for (const dir of directions) {
+            const nx = current.x + dir.dx;
+            const ny = current.y + dir.dy;
+            
+            if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE || gameState.maze[ny][nx].type === 'wall') continue;
+            if (closedList.some(node => node.x === nx && node.y === ny)) continue;
+            
+            const g = current.g + 1;
+            const h = heuristic({x: nx, y: ny}, end);
+            const f = g + h;
+            const existingOpenNode = openList.find(node => node.x === nx && node.y === ny);
+            
+            if (existingOpenNode) {
+                if (g < existingOpenNode.g) {
+                    existingOpenNode.g = g;
+                    existingOpenNode.f = g + existingOpenNode.h;
+                    existingOpenNode.parent = current;
+                }
+            } else {
+                openList.push({ x: nx, y: ny, g: g, h: h, f: f, parent: current });
+            }
+        }
+    }
+    return [];
+}
+
+function moveEnemies() {
+    for (const enemy of gameState.enemies) {
+        if (Math.random() < enemy.intelligence) {
+            if (enemy.path.length === 0 || gameState.tickCount % 5 === 0) {
+                enemy.path = aStarPathfinding({ x: enemy.x, y: enemy.y }, { x: gameState.player.x, y: gameState.player.y });
+            }
+            if (enemy.path.length > 0) {
+                const nextStep = enemy.path.shift();
+                const dx = nextStep.x - enemy.x;
+                const dy = nextStep.y - enemy.y;
+                enemy.x = nextStep.x;
+                enemy.y = nextStep.y;
+                enemy.lastMove = { x: dx, y: dy };
+            } else {
+                // Fallback logic kept identical to provided code
+                const dx = Math.sign(gameState.player.x - enemy.x);
+                const dy = Math.sign(gameState.player.y - enemy.y);
+                let moved = false;
+                if (Math.abs(dx) > Math.abs(dy) || (Math.abs(dx) === Math.abs(dy) && Math.random() < 0.5)) {
+                    if (isValidMove(enemy.x + dx, enemy.y)) { enemy.x += dx; enemy.lastMove = { x: dx, y: 0 }; moved = true; }
+                }
+                if (!moved) {
+                    if (isValidMove(enemy.x, enemy.y + dy)) { enemy.y += dy; enemy.lastMove = { x: 0, y: dy }; moved = true; }
+                }
+                if (!moved) {
+                    if (dx !== 0 && isValidMove(enemy.x + dx, enemy.y)) { enemy.x += dx; enemy.lastMove = { x: dx, y: 0 }; }
+                    else if (dy !== 0 && isValidMove(enemy.x, enemy.y + dy)) { enemy.y += dy; enemy.lastMove = { x: 0, y: dy }; }
+                }
+            }
+        } else {
+            const directions = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
+            const validDirections = directions.filter(dir => isValidMove(enemy.x + dir.dx, enemy.y + dir.dy));
+            if (validDirections.length > 0) {
+                const dir = validDirections[Math.floor(Math.random() * validDirections.length)];
+                enemy.x += dir.dx;
+                enemy.y += dir.dy;
+                enemy.lastMove = { x: dir.dx, y: dir.dy };
+            }
+        }
+        enemy.intelligence = Math.min(0.9, enemy.intelligence + 0.001 * gameState.difficultyLevel);
+    }
+}
+
+function isValidMove(x, y) {
+    return x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE && gameState.maze[y][x].type !== 'wall';
+}
+
+function checkEnemyCollisions() {
+    for (const enemy of gameState.enemies) {
+        if (enemy.x === gameState.player.x && enemy.y === gameState.player.y) {
+            gameState.player.health -= 10;
+            const dx = -enemy.lastMove.x;
+            const dy = -enemy.lastMove.y;
+            if (isValidMove(gameState.player.x + dx, gameState.player.y + dy)) {
+                gameState.player.x += dx;
+                gameState.player.y += dy;
+            }
+            updateUI();
+            if (gameState.player.health <= 0) {
+                gameState.gameOver = true;
+                showMessage("CRITICAL FAILURE. SUBJECT TERMINATED.");
+                setTimeout(() => { initGame(); }, 3000);
+            }
+        }
+    }
+}
+
+function checkPowerupCollection() {
+    for (let i = gameState.powerups.length - 1; i >= 0; i--) {
+        const powerup = gameState.powerups[i];
+        if (powerup.x === gameState.player.x && powerup.y === gameState.player.y) {
+            if (powerup.type === 'health') {
+                gameState.player.health = Math.min(100, gameState.player.health + 20);
+                // No text popup, rely on bar update
+            } else if (powerup.type === 'speed') {
+                gameState.player.score += 100;
+            }
+            gameState.powerups.splice(i, 1);
+            updateUI();
+        }
+    }
+}
+
+function adaptMaze() {
+    if (gameState.playerHistory.length < 5) return;
+    for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+            if (x === 0 || y === 0 || x === GRID_SIZE - 1 || y === GRID_SIZE - 1 ||
+                (x === gameState.player.x && y === gameState.player.y) ||
+                (x === gameState.exit.x && y === gameState.exit.y)) { continue; }
+            
+            const distToPlayer = Math.abs(x - gameState.player.x) + Math.abs(y - gameState.player.y);
+            if (distToPlayer < 3) continue;
+            
+            if (Math.random() < gameState.maze[y][x].adaptability * ADAPTATION_RATE) {
+                const recentMoves = gameState.playerHistory.slice(-5);
+                const horizontalMoves = recentMoves.filter(move => Math.abs(move.dx) > Math.abs(move.dy)).length;
+                const verticalMoves = recentMoves.length - horizontalMoves;
+                const playerDirection = horizontalMoves > verticalMoves ? 'horizontal' : 'vertical';
+                let shouldBeWall;
+                if (playerDirection === 'horizontal' && y % 2 === 0) { shouldBeWall = Math.random() < 0.7; } 
+                else if (playerDirection === 'vertical' && x % 2 === 0) { shouldBeWall = Math.random() < 0.7; } 
+                else { shouldBeWall = Math.random() < 0.3; }
+                
+                if (!shouldBeWall || pathExistsWithChange(gameState.player, gameState.exit, { x, y, type: 'wall' })) {
+                    gameState.maze[y][x].type = shouldBeWall ? 'wall' : 'empty';
+                }
+            }
+        }
+    }
+    if (Math.random() < 0.2) {
+        const needsHealth = gameState.player.health < 50;
+        spawnSpecificPowerup(needsHealth ? 'health' : 'speed');
+    }
+}
+
+function pathExistsWithChange(start, end, change) {
+    const tempMaze = [];
+    for (let y = 0; y < GRID_SIZE; y++) {
+        tempMaze[y] = [];
+        for (let x = 0; x < GRID_SIZE; x++) { tempMaze[y][x] = { ...gameState.maze[y][x] }; }
+    }
+    tempMaze[change.y][change.x].type = change.type;
+    const visited = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false));
+    const queue = [{ x: start.x, y: start.y }];
+    visited[start.y][start.x] = true;
+    while (queue.length > 0) {
+        const current = queue.shift();
+        if (current.x === end.x && current.y === end.y) { return true; }
+        const directions = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
+        for (const dir of directions) {
+            const nx = current.x + dir.dx;
+            const ny = current.y + dir.dy;
+            if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && !visited[ny][nx] && tempMaze[ny][nx].type !== 'wall') {
+                visited[ny][nx] = true;
+                queue.push({ x: nx, y: ny });
+            }
+        }
+    }
+    return false;
+}
+
+function spawnSpecificPowerup(type) {
+    let attempts = 0;
+    while (attempts < 10) {
+        const x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+        const y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+        if (gameState.maze[y][x].type === 'empty' &&
+            (x !== gameState.player.x || y !== gameState.player.y) &&
+            (x !== gameState.exit.x || y !== gameState.exit.y)) {
+            const powerupExists = gameState.powerups.some(p => p.x === x && p.y === y);
+            if (!powerupExists) { gameState.powerups.push({ x, y, type }); break; }
+        }
+        attempts++;
+    }
+}
+
+function movePlayer(dx, dy) {
+    const newX = gameState.player.x + dx;
+    const newY = gameState.player.y + dy;
+    if (isValidMove(newX, newY)) {
+        gameState.player.x = newX;
+        gameState.player.y = newY;
+        gameState.playerHistory.push({ dx, dy });
+        if (gameState.playerHistory.length > 20) { gameState.playerHistory.shift(); }
+        gameState.player.score += 1;
+        checkPowerupCollection();
+        updateUI();
+        if (gameState.player.x === gameState.exit.x && gameState.player.y === gameState.exit.y) {
+            gameState.won = true;
+            showMessage("SECTOR CLEARED. UPLOADING...");
+            updateUI();
+            setTimeout(() => { initGame(); }, 2000);
+        }
+    }
+}
+
+// Updated UI function to target new DOM structure
+function updateUI() {
+    document.getElementById('health-value').textContent = gameState.player.health;
+    document.getElementById('health-bar').style.width = gameState.player.health + '%';
+    document.getElementById('score-value').textContent = gameState.player.score;
+    document.getElementById('level-value').textContent = gameState.level;
+}
+
+function showMessage(text) {
+    const msgOverlay = document.getElementById('message-overlay');
+    const msgTitle = document.getElementById('msg-title');
+    const msgText = document.getElementById('msg-text');
+    
+    msgTitle.textContent = "SYSTEM ALERT";
+    msgText.textContent = text;
+    msgOverlay.classList.remove('hidden');
+    
+    // Don't auto-hide Game Over messages, only transient ones
+    if (!gameState.gameOver && !gameState.won) {
+        setTimeout(() => { msgOverlay.classList.add('hidden'); }, 1500);
+    }
+}
+
+document.addEventListener('keydown', (e) => {
+    if (gameState.gameOver || gameState.won) return;
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.key)) { e.preventDefault(); }
+    switch (e.key) {
+        case 'ArrowUp': case 'w': case 'W': movePlayer(0, -1); break;
+        case 'ArrowRight': case 'd': case 'D': movePlayer(1, 0); break;
+        case 'ArrowDown': case 's': case 'S': movePlayer(0, 1); break;
+        case 'ArrowLeft': case 'a': case 'A': movePlayer(-1, 0); break;
+    }
+    render();
+});
