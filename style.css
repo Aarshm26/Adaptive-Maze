@@ -1,0 +1,161 @@
+:root {
+    --bg-paper: #f0f0f0;
+    --ink-color: #2c3e50;
+    --ink-light: #5d6d7e;
+    --accent-red: #e74c3c;
+    --accent-blue: #3498db;
+    --grid-dot: #d1d1d1;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    font-family: 'Patrick Hand', cursive; /* The Indie Font */
+}
+
+body {
+    background-color: var(--bg-paper);
+    color: var(--ink-color);
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* CSS Dot Grid Pattern */
+    background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Vignette / Paper Texture effect */
+.paper-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle, transparent 60%, rgba(0,0,0,0.05) 100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+canvas {
+    background: #ffffff;
+    box-shadow: 10px 10px 0px rgba(0,0,0,0.1); /* Hard shadow for paper look */
+    border: 2px solid var(--ink-color);
+    border-radius: 2px;
+    z-index: 5;
+}
+
+.ui-layer {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    z-index: 10;
+}
+
+header {
+    padding: 20px 40px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.5rem;
+}
+
+.ink-bold { font-weight: bold; text-decoration: underline; text-decoration-style: wavy; }
+
+.stats-bar {
+    display: flex;
+    gap: 30px;
+    background: white;
+    padding: 5px 15px;
+    border: 2px solid var(--ink-color);
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; /* Wobbly border */
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.1);
+}
+
+/* Modal Styling */
+.overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(240, 240, 240, 0.8);
+    backdrop-filter: blur(2px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: auto;
+    transition: opacity 0.3s;
+}
+
+.overlay.hidden { opacity: 0; pointer-events: none; }
+
+.notebook-card {
+    background: white;
+    padding: 40px;
+    border: 3px solid var(--ink-color);
+    /* The "Sketchy" border radius trick */
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: 8px 8px 0 var(--ink-light);
+    transform: rotate(-1deg);
+}
+
+.notebook-card h1 { font-size: 3rem; margin-bottom: 10px; }
+.notebook-card p { font-size: 1.2rem; color: var(--ink-light); margin-bottom: 25px; }
+
+.sketch-btn {
+    background: var(--ink-color);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    font-family: 'Patrick Hand', cursive;
+    transform: rotate(1deg);
+    transition: transform 0.2s;
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+}
+
+.sketch-btn:hover { transform: rotate(-1deg) scale(1.05); }
+
+/* Toast */
+.toast {
+    position: absolute;
+    top: 100px; left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    border: 2px dashed var(--accent-red);
+    padding: 10px 20px;
+    font-size: 1.2rem;
+    transition: 0.3s;
+    transform: rotate(2deg) translateX(-50%);
+}
+.toast.hidden { opacity: 0; transform: translateY(-20px) translateX(-50%); }
+
+/* Mobile Controls */
+.mobile-controls {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 30px;
+    gap: 10px;
+    pointer-events: auto;
+}
+.d-pad-row { display: flex; gap: 15px; }
+.d-pad {
+    width: 60px; height: 60px;
+    background: white;
+    border: 2px solid var(--ink-color);
+    border-radius: 12px;
+    font-size: 1.5rem;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.1);
+}
+.d-pad:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 rgba(0,0,0,0.1); }
+
+@media (max-width: 768px) {
+    .mobile-controls { display: flex; }
+    header { padding: 10px; font-size: 1rem; }
+}
