@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PROTOCOL: ADAPT</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
 </head>
 
 <body data-theme="cyberpunk">
@@ -14,15 +15,30 @@
     <!-- Start Screen -->
     <div id="start-screen" class="overlay active">
         <div class="panel">
-            <h1>PROTOCOL: <span class="highlight">ADAPT</span></h1>
-            <p class="brief">SURVIVE THE ADAPTIVE MAZE</p>
-            <button id="start-btn" class="btn-main">START</button>
-            <button id="help-btn" class="btn-secondary">HELP</button>
-            <div class="theme-picker">
-                <span>THEME:</span>
-                <button class="theme-btn active" data-theme="cyberpunk">CYBER</button>
-                <button class="theme-btn" data-theme="arcade">ARCADE</button>
-                <button class="theme-btn" data-theme="noir">NOIR</button>
+            <div class="glitch-wrapper">
+                <h1 class="glitch" data-text="PROTOCOL: ADAPT">PROTOCOL: ADAPT</h1>
+            </div>
+            <p class="tagline">NEURAL SURVIVAL SIMULATION</p>
+            <div class="menu-buttons">
+                <button id="start-btn" class="btn-primary">INITIALIZE</button>
+                <button id="menu-help-btn" class="btn-secondary">MANUAL</button>
+            </div>
+            <div class="theme-selector">
+                <label>VISUAL MODE:</label>
+                <div class="theme-grid">
+                    <button class="theme-option active" data-theme="cyberpunk">
+                        <span class="theme-preview cyber"></span>
+                        <span>CYBER</span>
+                    </button>
+                    <button class="theme-option" data-theme="arcade">
+                        <span class="theme-preview arcade"></span>
+                        <span>ARCADE</span>
+                    </button>
+                    <button class="theme-option" data-theme="noir">
+                        <span class="theme-preview noir"></span>
+                        <span>NOIR</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -30,25 +46,49 @@
     <!-- Help Screen -->
     <div id="help-screen" class="overlay">
         <div class="panel">
-            <h2>HOW TO PLAY</h2>
-            <ul class="help-list">
-                <li>🎯 Use WASD or Arrow Keys to move</li>
-                <li>⚡ Press SPACE for special ability</li>
-                <li>🔴 Avoid red enemies</li>
-                <li>💎 Collect yellow powerups</li>
-                <li>🎯 Reach the cyan exit</li>
-            </ul>
-            <button id="close-help" class="btn-main">GOT IT</button>
+            <h2>SYSTEM MANUAL</h2>
+            <div class="manual-content">
+                <div class="manual-section">
+                    <h3>CONTROLS</h3>
+                    <ul>
+                        <li><span class="icon">⌨</span> WASD / Arrow Keys - Movement</li>
+                        <li><span class="icon">⚡</span> SPACE - Neural Pulse (stuns enemies)</li>
+                    </ul>
+                </div>
+                <div class="manual-section">
+                    <h3>OBJECTIVES</h3>
+                    <ul>
+                        <li><span class="icon">🎯</span> Reach the cyan exit portal</li>
+                        <li><span class="icon">👾</span> Avoid adaptive AI enemies</li>
+                        <li><span class="icon">💊</span> Collect health (+20 HP)</li>
+                        <li><span class="icon">💎</span> Collect data (+100 score)</li>
+                    </ul>
+                </div>
+                <div class="manual-section">
+                    <h3>ADAPTIVE AI</h3>
+                    <p>Enemies use A* pathfinding and adapt to your movement patterns. The maze itself evolves over time
+                        based on your behavior.</p>
+                </div>
+            </div>
+            <button id="close-help" class="btn-primary">UNDERSTOOD</button>
         </div>
     </div>
 
     <!-- Game Over Screen -->
     <div id="gameover-screen" class="overlay">
         <div class="panel">
-            <h1 id="gameover-title">GAME OVER</h1>
-            <p>Score: <span id="final-score">0</span></p>
-            <p>Level: <span id="final-level">0</span></p>
-            <button id="restart-btn" class="btn-main">RESTART</button>
+            <h1 id="gameover-title" class="status-title">SYSTEM FAILURE</h1>
+            <div class="stats-display">
+                <div class="stat-row">
+                    <span class="stat-label">FINAL SCORE:</span>
+                    <span class="stat-value" id="final-score">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">SECTORS CLEARED:</span>
+                    <span class="stat-value" id="final-level">0</span>
+                </div>
+            </div>
+            <button id="restart-btn" class="btn-primary">REBOOT SYSTEM</button>
         </div>
     </div>
 
@@ -58,51 +98,79 @@
 
     <!-- Game Interface -->
     <div id="game-interface" class="game-interface">
-        <div class="hud">
-            <div class="hud-left">
-                <h2>PROTOCOL: ADAPT</h2>
+        <div class="hud-container">
+            <div class="hud-section left">
+                <div class="logo">
+                    <h1>ADAPT</h1>
+                    <span class="version">v6.0</span>
+                </div>
             </div>
-            <div class="hud-right">
-                <div class="stat">
-                    <span class="label">HP</span>
-                    <span class="value" id="hp-display">100</span>
+
+            <div class="hud-section center">
+                <div class="stat-display-inline">
+                    <div class="stat-item">
+                        <span class="label">INTEGRITY</span>
+                        <div class="value-wrapper">
+                            <span class="value health" id="hp-display">100</span>
+                            <div class="stat-bar">
+                                <div class="bar-fill health-bar" id="hp-bar"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">PULSE</span>
+                        <div class="value-wrapper">
+                            <span class="value ability" id="ability-display">100</span>
+                            <div class="stat-bar">
+                                <div class="bar-fill ability-bar" id="ability-bar"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat">
+            </div>
+
+            <div class="hud-section right">
+                <div class="stat-item-simple">
                     <span class="label">SCORE</span>
-                    <span class="value" id="score-display">0</span>
+                    <span class="value score" id="score-display">0</span>
                 </div>
-                <div class="stat">
-                    <span class="label">LEVEL</span>
-                    <span class="value" id="level-display">1</span>
+                <div class="stat-item-simple">
+                    <span class="label">SECTOR</span>
+                    <span class="value level" id="level-display">1</span>
+                </div>
+                <div class="hud-actions">
+                    <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+                    <button id="sound-toggle" class="icon-btn" title="Sound">🔊</button>
                 </div>
             </div>
         </div>
 
         <div class="game-area">
             <canvas id="canvas"></canvas>
-            <div id="message" class="message"></div>
+            <div id="message" class="message-display"></div>
+            <div id="pulse-effect" class="pulse-effect"></div>
         </div>
 
-        <div class="controls desktop-only">
-            <span class="key">W</span>
-            <span class="key">A</span>
-            <span class="key">S</span>
-            <span class="key">D</span>
-            <span class="sep">•</span>
-            <span class="key wide">SPACE</span>
+        <div class="footer-controls desktop-only">
+            <div class="control-hint">
+                <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>
+                <span class="hint-text">MOVE</span>
+                <kbd class="wide">SPACE</kbd>
+                <span class="hint-text">PULSE</span>
+            </div>
         </div>
 
-        <!-- Mobile D-Pad -->
+        <!-- Mobile Controls -->
         <div class="mobile-controls">
-            <div class="dpad">
-                <button class="dpad-btn" data-dir="up">▲</button>
-                <div class="dpad-row">
-                    <button class="dpad-btn" data-dir="left">◀</button>
-                    <button class="dpad-btn" data-dir="down">▼</button>
-                    <button class="dpad-btn" data-dir="right">▶</button>
+            <div class="dpad-container">
+                <button class="dpad-btn up" data-dir="up">▲</button>
+                <div class="dpad-middle">
+                    <button class="dpad-btn left" data-dir="left">◀</button>
+                    <button class="dpad-btn down" data-dir="down">▼</button>
+                    <button class="dpad-btn right" data-dir="right">▶</button>
                 </div>
             </div>
-            <button id="ability-btn" class="ability-btn">⚡</button>
+            <button id="mobile-ability" class="ability-btn">⚡</button>
         </div>
     </div>
 

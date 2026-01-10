@@ -1,21 +1,25 @@
+// === ADAPTIVE MAZE v6.0 - Complete Implementation ===
+
 // === CONFIGURATION ===
 const CONFIG = {
     GRID_SIZE: 15,
     CELL_SIZE: 40,
     WALL_CHANCE: 0.3,
-    ENEMY_COUNT: 2,
+    ENEMY_BASE_COUNT: 2,
     POWERUP_COUNT: 3,
-    ADAPTATION_RATE: 0.15
+    ADAPTATION_RATE: 0.15,
+    ENEMY_ATTACK_DAMAGE: 10
 };
 
 // === GAME STATE ===
 let game = {
-    status: 'menu', // menu, playing, gameover
+    status: 'menu',
     level: 1,
     score: 0,
     health: 100,
+    abilityCharge: 100,
     grid: [],
-    player: { x: 1, y: 1, vx: 1, vy: 1 }, // vx/vy for smooth movement
+    player: { x: 1, y: 1, vx: 1, vy: 1 },
     exit: { x: 13, y: 13 },
     enemies: [],
     powerups: [],
@@ -23,49 +27,103 @@ let game = {
     history: [],
     tickCount: 0,
     difficulty: 1,
-    abilityCharge: 100
+    inLevelTransition: false,
+    soundEnabled: true
 };
 
 // === DOM ELEMENTS ===
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const elements = {
-    startScreen: document.getElementById('start-screen'),
-    helpScreen: document.getElementById('help-screen'),
-    gameoverScreen: document.getElementById('gameover-screen'),
-    gameInterface: document.getElementById('game-interface'),
-    startBtn: document.getElementById('start-btn'),
-    restartBtn: document.getElementById('restart-btn'),
-    helpBtn: document.getElementById('help-btn'),
-    closeHelp: document.getElementById('close-help'),
-    message: document.getElementById('message'),
-    hpDisplay: document.getElementById('hp-display'),
-    scoreDisplay: document.getElementById('score-display'),
-    levelDisplay: document.getElementById('level-display'),
-    finalScore: document.getElementById('final-score'),
-    finalLevel: document.getElementById('final-level'),
-    gameoverTitle: document.getElementById('gameover-title')
-};
+let canvas, ctx, elements, currentTheme = 'cyberpunk';
+
+// === AUDIO CONTEXT ===
+let audioCtx;
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function playSound(freq, type = 'sine', duration = 0.1, volume = 0.3) {
+    if (!game.soundEnabled || !audioCtx) return;
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.5, audioCtx.currentTime + duration);
+
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
 
 // === INITIALIZATION ===
 window.addEventListener('load', init);
 
 function init() {
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+
+    elements = {
+        startScreen: document.getElementById('start-screen'),
+        helpScreen: document.getElementById('help-screen'),
+        gameoverScreen: document.getElementById('gameover-screen'),
+        gameInterface: document.getElementById('game-interface'),
+        message: document.getElementById('message'),
+        pulseEffect: document.getElementById('pulse-effect'),
+        hpDisplay: document.getElementById('hp-display'),
+        scoreDisplay: document.getElementById('score-display'),
+        levelDisplay: document.getElementById('level-display'),
+        abilityDisplay: document.getElementById('ability-display'),
+        hpBar: document.getElementById('hp-bar'),
+        abilityBar: document.getElementById('ability-bar'),
+        finalScore: document.getElementById('final-score'),
+        finalLevel: document.getElementById('final-level'),
+        gameoverTitle: document.getElementById('gameover-title')
+    };
+
     setupEventListeners();
-    setupThemes();
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 }
 
 function setupEventListeners() {
     // Menu
-    elements.startBtn.addEventListener('click', startGame);
-    elements.restartBtn.addEventListener('click', () => {
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('restart-btn').addEventListener('click', () => {
         hideOverlay(elements.gameoverScreen);
         startGame();
     });
-    elements.helpBtn.addEventListener('click', () => showOverlay(elements.helpScreen));
-    elements.closeHelp.addEventListener('click', () => hideOverlay(elements.helpScreen));
+
+    // Help
+    document.getElementById('menu-help-btn').addEventListener('click', () => showOverlay(elements.helpScreen));
+    document.getElementById('close-help').addEventListener('click', () => hideOverlay(elements.helpScreen));
+
+    // Settings
+    document.getElementById('settings-btn').addEventListener('click', () => {
+        showOverlay(elements.startScreen);
+    });
+
+    // Sound toggle
+    document.getElementById('sound-toggle').addEventListener('click', (e) => {
+        game.soundEnabled = !game.soundEnabled;
+        e.target.textContent = game.soundEnabled ? '🔊' : '🔇';
+        playSound(440, 'sine', 0.05);
+    });
+
+    // Theme switcher
+    document.querySelectorAll('.theme-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+            changeTheme(btn.dataset.theme);
+            playSound(600, 'square', 0.05);
+        });
+    });
 
     // Keyboard
     document.addEventListener('keydown', handleKeyboard);
@@ -74,30 +132,26 @@ function setupEventListeners() {
     document.querySelectorAll('.dpad-btn').forEach(btn => {
         btn.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            const dir = btn.dataset.dir;
             const moves = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-            if (moves[dir]) movePlayer(moves[dir][0], moves[dir][1]);
+            const dir = moves[btn.dataset.dir];
+            if (dir && game.status === 'playing') movePlayer(dir[0], dir[1]);
         });
     });
 
-    const abilityBtn = document.getElementById('ability-btn');
-    if (abilityBtn) {
-        abilityBtn.addEventListener('touchstart', (e) => {
+    const mobileAbility = document.getElementById('mobile-ability');
+    if (mobileAbility) {
+        mobileAbility.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            useAbility();
+            if (game.status === 'playing') useAbility();
         });
     }
 }
 
-function setupThemes() {
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const theme = btn.dataset.theme;
-            document.body.setAttribute('data-theme', theme);
-            document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        });
-    });
+function changeTheme(theme) {
+    currentTheme = theme;
+    document.body.setAttribute('data-theme', theme);
+    document.querySelectorAll('.theme-option').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-theme="${theme}"]`).classList.add('active');
 }
 
 function handleKeyboard(e) {
@@ -105,25 +159,19 @@ function handleKeyboard(e) {
 
     const key = e.key.toLowerCase();
 
-    // Movement
-    if (key === 'w' || key === 'arrowup') movePlayer(0, -1);
-    if (key === 's' || key === 'arrowdown') movePlayer(0, 1);
-    if (key === 'a' || key === 'arrowleft') movePlayer(-1, 0);
-    if (key === 'd' || key === 'arrowright') movePlayer(1, 0);
-
-    // Ability
-    if (key === ' ') {
-        e.preventDefault();
-        useAbility();
-    }
+    if (key === 'w' || key === 'arrowup') { e.preventDefault(); movePlayer(0, -1); }
+    if (key === 's' || key === 'arrowdown') { e.preventDefault(); movePlayer(0, 1); }
+    if (key === 'a' || key === 'arrowleft') { e.preventDefault(); movePlayer(-1, 0); }
+    if (key === 'd' || key === 'arrowright') { e.preventDefault(); movePlayer(1, 0); }
+    if (key === ' ') { e.preventDefault(); useAbility(); }
 }
 
 // === GAME FLOW ===
 function startGame() {
+    initAudio();
     hideOverlay(elements.startScreen);
     elements.gameInterface.style.display = 'flex';
 
-    // Reset game state
     game.status = 'playing';
     game.health = 100;
     game.score = 0;
@@ -131,24 +179,33 @@ function startGame() {
     game.difficulty = 1;
     game.abilityCharge = 100;
     game.tickCount = 0;
+    game.inLevelTransition = false;
 
     initLevel();
+    playSound(800, 'square', 0.2);
     updateUI();
     requestAnimationFrame(gameLoop);
 }
 
 function initLevel() {
+    game.inLevelTransition = false;
     generateMaze();
     spawnPlayer();
     spawnExit();
     spawnEnemies();
     spawnPowerups();
     game.history = [];
-    showMessage('LEVEL ' + game.level);
+    game.particles = [];
+    showMessage('SECTOR ' + game.level);
+    playSound(1000, 'triangle', 0.3);
 }
 
-function gameLoop() {
+let lastFrameTime = 0;
+function gameLoop(timestamp) {
     if (game.status !== 'playing') return;
+
+    const deltaTime = timestamp - lastFrameTime;
+    lastFrameTime = timestamp;
 
     update();
     render();
@@ -162,15 +219,15 @@ function update() {
     game.player.vx += (game.player.x - game.player.vx) * 0.25;
     game.player.vy += (game.player.y - game.player.vy) * 0.25;
 
-    // Update enemies
-    if (game.tickCount % 60 === 0) {
-        game.enemies.forEach(updateEnemy);
+    // Update enemies with A* pathfinding
+    if (game.tickCount % 30 === 0) {
+        game.enemies.forEach(updateEnemyAI);
     }
 
     // Smooth enemy movement
     game.enemies.forEach(e => {
-        e.vx += (e.x - e.vx) * 0.1;
-        e.vy += (e.y - e.vy) * 0.1;
+        e.vx += (e.x - e.vx) * 0.15;
+        e.vy += (e.y - e.vy) * 0.15;
     });
 
     // Check collisions
@@ -178,12 +235,108 @@ function update() {
 
     // Ability charge
     if (game.abilityCharge < 100) {
-        game.abilityCharge = Math.min(100, game.abilityCharge + 0.3);
+        game.abilityCharge = Math.min(100, game.abilityCharge + 0.5);
     }
 
     // Adapt maze
-    if (game.tickCount % 200 === 0) {
+    if (game.tickCount % 150 === 0) {
         adaptMaze();
+    }
+
+    // Update particles
+    updateParticles();
+
+    updateUI();
+}
+
+// === A* PATHFINDING ===
+function aStarPath(start, goal) {
+    const openSet = [{ ...start, g: 0, h: heuristic(start, goal), f: heuristic(start, goal), parent: null }];
+    const closedSet = [];
+
+    function heuristic(a, b) {
+        return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    }
+
+    while (openSet.length > 0) {
+        // Get node with lowest f
+        let currentIndex = 0;
+        for (let i = 1; i < openSet.length; i++) {
+            if (openSet[i].f < openSet[currentIndex].f) {
+                currentIndex = i;
+            }
+        }
+        const current = openSet[currentIndex];
+
+        // Goal reached
+        if (current.x === goal.x && current.y === goal.y) {
+            const path = [];
+            let temp = current;
+            while (temp.parent) {
+                path.unshift({ x: temp.x, y: temp.y });
+                temp = temp.parent;
+            }
+            return path;
+        }
+
+        // Move to closed set
+        openSet.splice(currentIndex, 1);
+        closedSet.push(current);
+
+        // Check neighbors
+        const neighbors = [
+            { x: current.x + 1, y: current.y },
+            { x: current.x - 1, y: current.y },
+            { x: current.x, y: current.y + 1 },
+            { x: current.x, y: current.y - 1 }
+        ];
+
+        for (const neighbor of neighbors) {
+            if (!isValid(neighbor.x, neighbor.y)) continue;
+            if (closedSet.some(n => n.x === neighbor.x && n.y === neighbor.y)) continue;
+
+            const g = current.g + 1;
+            const h = heuristic(neighbor, goal);
+            const f = g + h;
+
+            const existingOpen = openSet.find(n => n.x === neighbor.x && n.y === neighbor.y);
+            if (existingOpen) {
+                if (g < existingOpen.g) {
+                    existingOpen.g = g;
+                    existingOpen.f = f;
+                    existingOpen.parent = current;
+                }
+            } else {
+                openSet.push({ ...neighbor, g, h, f, parent: current });
+            }
+        }
+
+        // Limit search
+        if (closedSet.length > 200) break;
+    }
+
+    return [];
+}
+
+function updateEnemyAI(enemy) {
+    // Calculate path using A*
+    const path = aStarPath({ x: enemy.x, y: enemy.y }, { x: game.player.x, y: game.player.y });
+
+    if (path.length > 0) {
+        const next = path[0];
+        enemy.x = next.x;
+        enemy.y = next.y;
+        enemy.intelligence = Math.min(0.95, (enemy.intelligence || 0.5) + 0.01);
+    } else {
+        // Fallback to simple movement
+        const dx = Math.sign(game.player.x - enemy.x);
+        const dy = Math.sign(game.player.y - enemy.y);
+
+        if (Math.abs(dx) > Math.abs(dy) && isValid(enemy.x + dx, enemy.y)) {
+            enemy.x += dx;
+        } else if (isValid(enemy.x, enemy.y + dy)) {
+            enemy.y += dy;
+        }
     }
 }
 
@@ -202,11 +355,9 @@ function generateMaze() {
         game.grid.push(row);
     }
 
-    // Ensure start and end are empty
     game.grid[1][1].type = 'empty';
     game.grid[CONFIG.GRID_SIZE - 2][CONFIG.GRID_SIZE - 2].type = 'empty';
 
-    // Ensure path exists
     ensurePath();
 }
 
@@ -230,10 +381,21 @@ function adaptMaze() {
         for (let x = 1; x < CONFIG.GRID_SIZE - 1; x++) {
             const dist = Math.abs(x - game.player.x) + Math.abs(y - game.player.y);
             if (dist < 4) continue;
+            if (x === game.exit.x && y === game.exit.y) continue;
 
-            if (Math.random() < 0.01) {
-                const cell = game.grid[y][x];
-                cell.type = cell.type === 'wall' ? 'empty' : 'wall';
+            const cell = game.grid[y][x];
+
+            if (Math.random() < cell.adaptability * CONFIG.ADAPTATION_RATE * 0.5) {
+                const wasWall = cell.type === 'wall';
+                cell.type = wasWall ? 'empty' : 'wall';
+
+                // Verify path still exists
+                const testPath = aStarPath({ x: game.player.x, y: game.player.y }, game.exit);
+                if (testPath.length === 0) {
+                    cell.type = wasWall ? 'wall' : 'empty';
+                } else {
+                    spawnParticles(x, y, 'adapt', 3);
+                }
             }
         }
     }
@@ -250,10 +412,16 @@ function spawnExit() {
 
 function spawnEnemies() {
     game.enemies = [];
-    const count = CONFIG.ENEMY_COUNT + Math.floor(game.difficulty / 2);
+    const count = CONFIG.ENEMY_BASE_COUNT + Math.floor(game.difficulty / 2);
     for (let i = 0; i < count; i++) {
         const pos = findEmptyCell();
-        game.enemies.push({ x: pos.x, y: pos.y, vx: pos.x, vy: pos.y });
+        game.enemies.push({
+            x: pos.x,
+            y: pos.y,
+            vx: pos.x,
+            vy: pos.y,
+            intelligence: 0.5 + (game.difficulty * 0.1)
+        });
     }
 }
 
@@ -275,12 +443,14 @@ function findEmptyCell() {
         x = Math.floor(Math.random() * (CONFIG.GRID_SIZE - 2)) + 1;
         y = Math.floor(Math.random() * (CONFIG.GRID_SIZE - 2)) + 1;
         tries++;
-    } while (game.grid[y][x].type !== 'empty' && tries < 100);
+    } while ((game.grid[y][x].type !== 'empty' || (x === game.player.x && y === game.player.y)) && tries < 100);
     return { x, y };
 }
 
 // === PLAYER ===
 function movePlayer(dx, dy) {
+    if (game.inLevelTransition) return; // FIX: Prevent movement during level transition
+
     const newX = game.player.x + dx;
     const newY = game.player.y + dy;
 
@@ -290,10 +460,14 @@ function movePlayer(dx, dy) {
         game.history.push({ dx, dy });
         if (game.history.length > 20) game.history.shift();
 
+        playSound(200 + Math.random() * 100, 'square', 0.05, 0.1);
+
         // Check win
         if (newX === game.exit.x && newY === game.exit.y) {
             levelComplete();
         }
+    } else {
+        playSound(100, 'sawtooth', 0.1, 0.15);
     }
 }
 
@@ -301,26 +475,6 @@ function isValid(x, y) {
     return x >= 0 && x < CONFIG.GRID_SIZE &&
         y >= 0 && y < CONFIG.GRID_SIZE &&
         game.grid[y][x].type === 'empty';
-}
-
-// === ENEMIES ===
-function updateEnemy(enemy) {
-    const dx = Math.sign(game.player.x - enemy.x);
-    const dy = Math.sign(game.player.y - enemy.y);
-
-    if (Math.random() < 0.3) {
-        const rdx = Math.random() < 0.5 ? 1 : -1;
-        if (isValid(enemy.x + rdx, enemy.y)) {
-            enemy.x += rdx;
-            return;
-        }
-    }
-
-    if (dx !== 0 && isValid(enemy.x + dx, enemy.y)) {
-        enemy.x += dx;
-    } else if (dy !== 0 && isValid(enemy.x, enemy.y + dy)) {
-        enemy.y += dy;
-    }
 }
 
 // === COLLISIONS ===
@@ -332,24 +486,31 @@ function checkCollisions() {
             if (p.type === 'health') {
                 game.health = Math.min(100, game.health + 20);
                 showMessage('+20 HP');
+                playSound(600, 'sine', 0.2);
             } else {
                 game.score += 100;
                 showMessage('+100');
+                playSound(800, 'sine', 0.2);
             }
+            spawnParticles(p.x, p.y, 'collect', 15);
             game.powerups.splice(i, 1);
-            updateUI();
         }
     }
 
-    // Enemies
+    // Enemies (improved collision)
     game.enemies.forEach(e => {
         const dist = Math.hypot(e.vx - game.player.vx, e.vy - game.player.vy);
-        if (dist < 0.6) {
-            game.health -= 0.5;
-            if (game.health <= 0) {
-                gameOver();
+        if (dist < 0.7) {
+            // Only damage when enemy is very close
+            if (game.tickCount % 30 === 0) { // Damage every half second
+                game.health -= CONFIG.ENEMY_ATTACK_DAMAGE;
+                playSound(150, 'sawtooth', 0.15, 0.2);
+                spawnParticles(game.player.vx, game.player.vy, 'damage', 10);
+
+                if (game.health <= 0) {
+                    gameOver();
+                }
             }
-            updateUI();
         }
     });
 }
@@ -358,28 +519,93 @@ function checkCollisions() {
 function useAbility() {
     if (game.abilityCharge >= 100) {
         game.abilityCharge = 0;
-        showMessage('PULSE!');
+        showMessage('NEURAL PULSE!');
+        playSound(400, 'sawtooth', 0.5, 0.4);
+
+        // Visual effect
+        elements.pulseEffect.classList.add('active');
+        setTimeout(() => elements.pulseEffect.classList.remove('active'), 600);
 
         // Push enemies away
         game.enemies.forEach(e => {
-            const dx = Math.sign(e.x - game.player.x);
-            const dy = Math.sign(e.y - game.player.y);
-            const newX = e.x + dx * 3;
-            const newY = e.y + dy * 3;
-            if (isValid(newX, newY)) {
-                e.x = newX;
-                e.y = newY;
+            const dx = e.x - game.player.x;
+            const dy = e.y - game.player.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < 5) {
+                const pushDist = 4;
+                const newX = e.x + Math.sign(dx) * pushDist;
+                const newY = e.y + Math.sign(dy) * pushDist;
+
+                // Clamp and validate
+                const finalX = Math.max(1, Math.min(CONFIG.GRID_SIZE - 2, newX));
+                const finalY = Math.max(1, Math.min(CONFIG.GRID_SIZE - 2, newY));
+
+                if (isValid(finalX, finalY)) {
+                    e.x = finalX;
+                    e.y = finalY;
+                }
+
+                spawnParticles(e.vx, e.vy, 'pulse', 20);
             }
         });
+    } else {
+        showMessage('CHARGING...');
+        playSound(200, 'sine', 0.1);
+    }
+}
+
+// === PARTICLES ===
+class Particle {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.life = 1.0;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.05 + Math.random() * 0.1;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.size = 0.1 + Math.random() * 0.2;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 0.02;
+        this.vx *= 0.98;
+        this.vy *= 0.98;
+    }
+}
+
+function spawnParticles(x, y, type, count) {
+    for (let i = 0; i < count; i++) {
+        game.particles.push(new Particle(x + 0.5, y + 0.5, type));
+    }
+}
+
+function updateParticles() {
+    for (let i = game.particles.length - 1; i >= 0; i--) {
+        game.particles[i].update();
+        if (game.particles[i].life <= 0) {
+            game.particles.splice(i, 1);
+        }
     }
 }
 
 // === LEVEL/GAME END ===
 function levelComplete() {
+    if (game.inLevelTransition) return; // FIX: Prevent double trigger
+
+    game.inLevelTransition = true;
     game.level++;
     game.score += 500;
     game.difficulty += 0.5;
-    showMessage('LEVEL COMPLETE!');
+
+    showMessage('SECTOR CLEARED!');
+    playSound(1200, 'triangle', 0.5);
+    spawnParticles(game.exit.x, game.exit.y, 'victory', 30);
+
     setTimeout(() => {
         initLevel();
     }, 2000);
@@ -389,27 +615,74 @@ function gameOver() {
     game.status = 'gameover';
     elements.finalScore.textContent = Math.floor(game.score);
     elements.finalLevel.textContent = game.level;
+    elements.gameoverTitle.textContent = 'SYSTEM FAILURE';
+    playSound(200, 'sawtooth', 1.0, 0.3);
     showOverlay(elements.gameoverScreen);
 }
 
 // === RENDERING ===
 function resizeCanvas() {
     const container = document.querySelector('.game-area');
+    if (!container) return;
     const size = Math.min(container.clientWidth, container.clientHeight) - 20;
     canvas.width = size;
     canvas.height = size;
 }
 
+function getThemeColors() {
+    const themes = {
+        cyberpunk: {
+            bg: '#0a0e27',
+            grid: 'rgba(0, 243, 255, 0.15)',
+            wall: '#1a2a3f',
+            wallBorder: '#2a4a6f',
+            exit: '#00f3ff',
+            player: '#00f3ff',
+            enemy: '#ff0055',
+            healthPowerup: '#ff0055',
+            scorePowerup: '#ffee00',
+            particle: '#00f3ff'
+        },
+        arcade: {
+            bg: '#1a1a2e',
+            grid: 'rgba(0, 0, 0, 0.1)',
+            wall: '#57606f',
+            wallBorder: '#2b2d42',
+            exit: '#f72585',
+            player: '#4cc9f0',
+            enemy: '#f72585',
+            healthPowerup: '#f72585',
+            scorePowerup: '#ffd60a',
+            particle: '#4cc9f0'
+        },
+        noir: {
+            bg: '#000000',
+            grid: 'rgba(255, 255, 255, 0.2)',
+            wall: '#2a2a2a',
+            wallBorder: '#444444',
+            exit: '#ffffff',
+            player: '#ffffff',
+            enemy: '#cccccc',
+            healthPowerup: '#888888',
+            scorePowerup: '#aaaaaa',
+            particle: '#ffffff'
+        }
+    };
+
+    return themes[currentTheme] || themes.cyberpunk;
+}
+
 function render() {
     const size = canvas.width;
     const cellSize = size / CONFIG.GRID_SIZE;
+    const colors = getThemeColors();
 
     // Clear
-    ctx.fillStyle = '#0a0e27';
+    ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, size, size);
 
-    // Draw grid
-    ctx.strokeStyle = 'rgba(0, 243, 255, 0.1)';
+    // Grid
+    ctx.strokeStyle = colors.grid;
     ctx.lineWidth = 1;
     for (let i = 0; i <= CONFIG.GRID_SIZE; i++) {
         ctx.beginPath();
@@ -422,68 +695,128 @@ function render() {
         ctx.stroke();
     }
 
-    // Draw walls
-    ctx.fillStyle = '#1a2a3a';
+    // Walls
     for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
         for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
             if (game.grid[y][x].type === 'wall') {
-                ctx.fillRect(x * cellSize + 1, y * cellSize + 1, cellSize - 2, cellSize - 2);
+                const px = x * cellSize;
+                const py = y * cellSize;
+
+                ctx.fillStyle = colors.wall;
+                ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+
+                ctx.strokeStyle = colors.wallBorder;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(px + 3, py + 3, cellSize - 6, cellSize - 6);
             }
         }
     }
 
-    // Draw exit
-    ctx.strokeStyle = '#00f3ff';
-    ctx.lineWidth = 2;
+    // Exit
+    ctx.strokeStyle = colors.exit;
+    ctx.lineWidth = 3;
+    const exitPulse = Math.sin(game.tickCount * 0.1) * 3;
     ctx.beginPath();
     ctx.arc(
         game.exit.x * cellSize + cellSize / 2,
         game.exit.y * cellSize + cellSize / 2,
-        cellSize / 3,
+        cellSize / 3 + exitPulse,
         0,
         Math.PI * 2
     );
     ctx.stroke();
 
-    // Draw powerups
+    ctx.fillStyle = colors.exit + '33';
+    ctx.fill();
+
+    // Powerups
     game.powerups.forEach(p => {
-        ctx.fillStyle = p.type === 'health' ? '#ff0055' : '#ffee00';
+        ctx.fillStyle = p.type === 'health' ? colors.healthPowerup : colors.scorePowerup;
+        const powerupPulse = Math.sin(game.tickCount * 0.15) * 2;
         ctx.beginPath();
         ctx.arc(
             p.x * cellSize + cellSize / 2,
             p.y * cellSize + cellSize / 2,
-            cellSize / 5,
+            cellSize / 5 + powerupPulse,
             0,
             Math.PI * 2
         );
         ctx.fill();
     });
 
-    // Draw enemies
-    ctx.fillStyle = '#ff0055';
+    // Particles
+    game.particles.forEach(p => {
+        ctx.globalAlpha = p.life;
+        const particleColors = {
+            collect: colors.scorePowerup,
+            damage: colors.enemy,
+            pulse: '#bd00ff',
+            adapt: colors.particle,
+            victory: colors.exit
+        };
+        ctx.fillStyle = particleColors[p.type] || colors.particle;
+        ctx.fillRect(
+            p.x * cellSize - p.size * cellSize / 2,
+            p.y * cellSize - p.size * cellSize / 2,
+            p.size * cellSize,
+            p.size * cellSize
+        );
+    });
+    ctx.globalAlpha = 1;
+
+    // Enemies
     game.enemies.forEach(e => {
+        ctx.fillStyle = colors.enemy;
         ctx.beginPath();
-        ctx.arc(
-            e.vx * cellSize + cellSize / 2,
-            e.vy * cellSize + cellSize / 2,
-            cellSize / 3,
-            0,
-            Math.PI * 2
-        );
+        const ex = e.vx * cellSize + cellSize / 2;
+        const ey = e.vy * cellSize + cellSize / 2;
+        const er = cellSize / 3.5;
+
+        // Diamond shape
+        ctx.moveTo(ex, ey - er);
+        ctx.lineTo(ex + er, ey);
+        ctx.lineTo(ex, ey + er);
+        ctx.lineTo(ex - er, ey);
+        ctx.closePath();
         ctx.fill();
+
+        // Glow
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = colors.enemy;
+        ctx.fill();
+        ctx.shadowBlur = 0;
     });
 
-    // Draw player
-    ctx.fillStyle = '#00f3ff';
+    // Player
+    ctx.fillStyle = colors.player;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = colors.player;
     ctx.beginPath();
     ctx.arc(
         game.player.vx * cellSize + cellSize / 2,
         game.player.vy * cellSize + cellSize / 2,
-        cellSize / 3,
+        cellSize / 3.5,
         0,
         Math.PI * 2
     );
     ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Ability charge indicator
+    if (game.abilityCharge >= 100) {
+        ctx.strokeStyle = '#bd00ff';
+        ctx.lineWidth = 2;
+        const abilityPulse = Math.sin(game.tickCount * 0.2) * 3;
+        ctx.beginPath();
+        ctx.arc(
+            game.player.vx * cellSize + cellSize / 2,
+            game.player.vy * cellSize + cellSize / 2,
+            cellSize / 2.5 + abilityPulse,
+            0,
+            Math.PI * 2
+        );
+        ctx.stroke();
+    }
 }
 
 // === UI ===
@@ -491,6 +824,10 @@ function updateUI() {
     elements.hpDisplay.textContent = Math.floor(game.health);
     elements.scoreDisplay.textContent = Math.floor(game.score);
     elements.levelDisplay.textContent = game.level;
+    elements.abilityDisplay.textContent = Math.floor(game.abilityCharge);
+
+    elements.hpBar.style.width = Math.max(0, game.health) + '%';
+    elements.abilityBar.style.width = Math.max(0, game.abilityCharge) + '%';
 }
 
 function showMessage(text) {
