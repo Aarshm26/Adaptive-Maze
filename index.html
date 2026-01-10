@@ -17,7 +17,31 @@
         <div class="panel">
             <h1>PROTOCOL: <span class="highlight">ADAPT</span></h1>
             <p class="mission-brief">OBJECTIVE: SURVIVE THE ADAPTIVE MAZE.</p>
-            <button id="start-btn" class="cyber-btn">INITIALIZE SEQUENCE</button>
+            <div class="menu-controls">
+                <button id="start-btn" class="cyber-btn">INITIALIZE</button>
+                <button id="help-btn" class="cyber-btn sm">?</button>
+            </div>
+            <div class="theme-select">
+                <span>THEME:</span>
+                <button class="theme-btn active" data-theme="cyberpunk">CYBER</button>
+                <button class="theme-btn" data-theme="arcade">ARCADE</button>
+                <button class="theme-btn" data-theme="noir">NOIR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-screen" class="ui-overlay hidden">
+        <div class="panel">
+            <h2>SYSTEM MANUAL</h2>
+            <ul class="help-list">
+                <li><span class="icon">✛</span> <strong>WASD / ARROWS</strong> to Move</li>
+                <li><span class="icon">⚡</span> <strong>SPACE</strong> to use ABILITY (Stun)</li>
+                <li><span class="icon">◆</span> Avoid <strong>ENEMIES</strong></li>
+                <li><span class="icon">●</span> Collect <strong>DATA</strong> for Score</li>
+                <li><span class="icon">◎</span> Reach <strong>EXIT</strong> to Advance</li>
+            </ul>
+            <button id="close-help-btn" class="cyber-btn">ACKNOWLEDGE</button>
         </div>
     </div>
 
@@ -40,7 +64,10 @@
         <header class="hud-header">
             <div class="logo-area">
                 <div class="logo-glitch" data-text="ADAPT">PROTOCOL: ADAPT</div>
-                <div class="subtitle">AI SURVIVAL SIMULATION // v3.0</div>
+                <div class="actions-area">
+                    <button id="ingame-help" class="icon-btn">?</button>
+                    <!-- <button id="mute-toggle" class="icon-btn">🔊</button> -->
+                </div>
             </div>
 
             <div class="hud-stats">
@@ -53,11 +80,18 @@
                         </div>
                     </div>
                 </div>
+                <!-- Ability Cooldown UI -->
                 <div class="stat-unit">
-                    <div class="label">DATA</div>
-                    <div class="value score-color" id="score-value">0</div>
+                    <div class="label">ABILITY</div>
+                    <div class="bar-container">
+                        <div class="value ability-color" id="ability-status">READY</div>
+                        <div class="bar-bg">
+                            <div id="ability-bar" class="bar-fill ability-fill"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-unit">
+                <!-- Hidden on mobile to save space -->
+                <div class="stat-unit mobile-hide">
                     <div class="label">SECTOR</div>
                     <div class="value level-color" id="level-value">1</div>
                 </div>
@@ -79,10 +113,25 @@
             <div id="message" class="message-overlay hidden">SYSTEM READY</div>
         </div>
 
-        <div class="controls-legend">
+        <div class="controls-legend desktop-only">
             <div class="key-group"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span
                     class="key">D</span></div>
-            <span class="instruction">TO NAVIGATE</span>
+            <span class="instruction">MOVE</span>
+            <div class="key-group"><span class="key wide">SPACE</span></div>
+            <span class="instruction">PULSE</span>
+        </div>
+
+        <!-- Mobile Controls -->
+        <div class="mobile-controls touch-only">
+            <div class="dpad">
+                <button id="btn-up" class="dpad-btn up">▲</button>
+                <div class="dpad-middle">
+                    <button id="btn-left" class="dpad-btn left">◀</button>
+                    <button id="btn-down" class="dpad-btn down">▼</button>
+                    <button id="btn-right" class="dpad-btn right">▶</button>
+                </div>
+            </div>
+            <button id="btn-ability" class="action-btn">⚡</button>
         </div>
     </div>
 
