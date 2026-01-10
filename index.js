@@ -1,4 +1,4 @@
-// === ADAPTIVE MAZE v6.0 - Complete Implementation ===
+// === ADAPTIVE MAZE v6.1 - Final Polish ===
 
 // === CONFIGURATION ===
 const CONFIG = {
@@ -8,7 +8,8 @@ const CONFIG = {
     ENEMY_BASE_COUNT: 2,
     POWERUP_COUNT: 3,
     ADAPTATION_RATE: 0.15,
-    ENEMY_ATTACK_DAMAGE: 10
+    ENEMY_ATTACK_DAMAGE: 10,
+    COMBO_TIMEOUT: 3000
 };
 
 // === GAME STATE ===
@@ -18,6 +19,9 @@ let game = {
     score: 0,
     health: 100,
     abilityCharge: 100,
+    combo: 1,
+    maxCombo: 1,
+    comboTimer: null,
     grid: [],
     player: { x: 1, y: 1, vx: 1, vy: 1 },
     exit: { x: 13, y: 13 },
@@ -28,13 +32,14 @@ let game = {
     tickCount: 0,
     difficulty: 1,
     inLevelTransition: false,
-    soundEnabled: true
+    soundEnabled: true,
+    paused: false
 };
 
 // === DOM ELEMENTS ===
-let canvas, ctx, elements, currentTheme = 'cyberpunk';
+let canvas, ctx, minimap, minimapCtx, elements, currentTheme = 'cyberpunk';
 
-// === AUDIO CONTEXT ===
+// === IMPROVED AUDIO ===
 let audioCtx;
 
 function initAudio() {
@@ -43,18 +48,32 @@ function initAudio() {
     }
 }
 
-function playSound(freq, type = 'sine', duration = 0.1, volume = 0.3) {
+// Improved audio with better waveforms and envelopes
+function playSound(type, volume = 0.2) {
     if (!game.soundEnabled || !audioCtx) return;
 
+    const sounds = {
+        move: () => playTone(300, 'sine', 0.05, volume * 0.3),
+        collect: () => playMelody([400, 600, 800], 0.1, volume * 0.4),
+        damage: () => playNoise(0.15, volume * 0.3),
+        pulse: () => playPulseSound(volume * 0.5),
+        levelComplete: () => playMelody([600, 700, 800, 1000], 0.15, volume * 0.6),
+        gameOver: () => playDescending([400, 300, 200, 100], 0.2, volume * 0.4),
+        combo: () => playMelody([800, 1000, 1200], 0.08, volume * 0.5)
+    };
+
+    if (sounds[type]) sounds[type]();
+}
+
+function playTone(freq, type, duration, volume) {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
 
     osc.type = type;
-    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.5, audioCtx.currentTime + duration);
+    osc.frequency.value = freq;
 
     gain.gain.setValueAtTime(volume, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
 
     osc.connect(gain);
     gain.connect(audioCtx.destination);
@@ -63,12 +82,77 @@ function playSound(freq, type = 'sine', duration = 0.1, volume = 0.3) {
     osc.stop(audioCtx.currentTime + duration);
 }
 
+function playMelody(notes, noteDuration, volume) {
+    notes.forEach((freq, i) => {
+        setTimeout(() => playTone(freq, 'sine', noteDuration, volume), i * noteDuration * 800);
+    });
+}
+
+function playDescending(notes, noteDuration, volume) {
+    notes.forEach((freq, i) => {
+        setTimeout(() => playTone(freq, 'triangle', noteDuration, volume * 0.7), i * noteDuration * 600);
+    });
+}
+
+function playNoise(duration, volume) {
+    const bufferSize = audioCtx.sampleRate * duration;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = audioCtx.createBufferSource();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+
+    filter.type = 'lowpass';
+    filter.frequency.value = 1000;
+
+    noise.buffer = buffer;
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    noise.start();
+}
+
+function playPulseSound(volume) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2000, audioCtx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.5);
+
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.5);
+}
+
 // === INITIALIZATION ===
 window.addEventListener('load', init);
 
 function init() {
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d');
+    minimap = document.getElementById('minimap');
+    minimapCtx = minimap.getContext('2d');
 
     elements = {
         startScreen: document.getElementById('start-screen'),
@@ -76,15 +160,18 @@ function init() {
         gameoverScreen: document.getElementById('gameover-screen'),
         gameInterface: document.getElementById('game-interface'),
         message: document.getElementById('message'),
+        comboPopup: document.getElementById('combo-popup'),
         pulseEffect: document.getElementById('pulse-effect'),
         hpDisplay: document.getElementById('hp-display'),
         scoreDisplay: document.getElementById('score-display'),
         levelDisplay: document.getElementById('level-display'),
         abilityDisplay: document.getElementById('ability-display'),
+        comboDisplay: document.getElementById('combo-display'),
         hpBar: document.getElementById('hp-bar'),
         abilityBar: document.getElementById('ability-bar'),
         finalScore: document.getElementById('final-score'),
         finalLevel: document.getElementById('final-level'),
+        finalCombo: document.getElementById('final-combo'),
         gameoverTitle: document.getElementById('gameover-title')
     };
 
@@ -105,8 +192,9 @@ function setupEventListeners() {
     document.getElementById('menu-help-btn').addEventListener('click', () => showOverlay(elements.helpScreen));
     document.getElementById('close-help').addEventListener('click', () => hideOverlay(elements.helpScreen));
 
-    // Settings
+    // Settings - PAUSE GAME
     document.getElementById('settings-btn').addEventListener('click', () => {
+        game.paused = true;
         showOverlay(elements.startScreen);
     });
 
@@ -114,14 +202,14 @@ function setupEventListeners() {
     document.getElementById('sound-toggle').addEventListener('click', (e) => {
         game.soundEnabled = !game.soundEnabled;
         e.target.textContent = game.soundEnabled ? '🔊' : '🔇';
-        playSound(440, 'sine', 0.05);
+        playSound('move');
     });
 
     // Theme switcher
     document.querySelectorAll('.theme-option').forEach(btn => {
         btn.addEventListener('click', () => {
             changeTheme(btn.dataset.theme);
-            playSound(600, 'square', 0.05);
+            playSound('move');
         });
     });
 
@@ -134,7 +222,7 @@ function setupEventListeners() {
             e.preventDefault();
             const moves = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
             const dir = moves[btn.dataset.dir];
-            if (dir && game.status === 'playing') movePlayer(dir[0], dir[1]);
+            if (dir && game.status === 'playing' && !game.paused) movePlayer(dir[0], dir[1]);
         });
     });
 
@@ -142,7 +230,7 @@ function setupEventListeners() {
     if (mobileAbility) {
         mobileAbility.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (game.status === 'playing') useAbility();
+            if (game.status === 'playing' && !game.paused) useAbility();
         });
     }
 }
@@ -155,7 +243,7 @@ function changeTheme(theme) {
 }
 
 function handleKeyboard(e) {
-    if (game.status !== 'playing') return;
+    if (game.status !== 'playing' || game.paused) return;
 
     const key = e.key.toLowerCase();
 
@@ -173,16 +261,19 @@ function startGame() {
     elements.gameInterface.style.display = 'flex';
 
     game.status = 'playing';
+    game.paused = false; // UNPAUSE when starting
     game.health = 100;
     game.score = 0;
     game.level = 1;
     game.difficulty = 1;
     game.abilityCharge = 100;
+    game.combo = 1;
+    game.maxCombo = 1;
     game.tickCount = 0;
     game.inLevelTransition = false;
 
     initLevel();
-    playSound(800, 'square', 0.2);
+    playSound('levelComplete');
     updateUI();
     requestAnimationFrame(gameLoop);
 }
@@ -197,7 +288,6 @@ function initLevel() {
     game.history = [];
     game.particles = [];
     showMessage('SECTOR ' + game.level);
-    playSound(1000, 'triangle', 0.3);
 }
 
 let lastFrameTime = 0;
@@ -207,10 +297,15 @@ function gameLoop(timestamp) {
     const deltaTime = timestamp - lastFrameTime;
     lastFrameTime = timestamp;
 
-    update();
+    if (!game.paused) { // Only update when not paused
+        update();
+    }
     render();
+    renderMinimap();
 
-    game.tickCount++;
+    if (!game.paused) {
+        game.tickCount++;
+    }
     requestAnimationFrame(gameLoop);
 }
 
@@ -259,7 +354,6 @@ function aStarPath(start, goal) {
     }
 
     while (openSet.length > 0) {
-        // Get node with lowest f
         let currentIndex = 0;
         for (let i = 1; i < openSet.length; i++) {
             if (openSet[i].f < openSet[currentIndex].f) {
@@ -268,7 +362,6 @@ function aStarPath(start, goal) {
         }
         const current = openSet[currentIndex];
 
-        // Goal reached
         if (current.x === goal.x && current.y === goal.y) {
             const path = [];
             let temp = current;
@@ -279,11 +372,9 @@ function aStarPath(start, goal) {
             return path;
         }
 
-        // Move to closed set
         openSet.splice(currentIndex, 1);
         closedSet.push(current);
 
-        // Check neighbors
         const neighbors = [
             { x: current.x + 1, y: current.y },
             { x: current.x - 1, y: current.y },
@@ -311,7 +402,6 @@ function aStarPath(start, goal) {
             }
         }
 
-        // Limit search
         if (closedSet.length > 200) break;
     }
 
@@ -319,7 +409,6 @@ function aStarPath(start, goal) {
 }
 
 function updateEnemyAI(enemy) {
-    // Calculate path using A*
     const path = aStarPath({ x: enemy.x, y: enemy.y }, { x: game.player.x, y: game.player.y });
 
     if (path.length > 0) {
@@ -328,7 +417,6 @@ function updateEnemyAI(enemy) {
         enemy.y = next.y;
         enemy.intelligence = Math.min(0.95, (enemy.intelligence || 0.5) + 0.01);
     } else {
-        // Fallback to simple movement
         const dx = Math.sign(game.player.x - enemy.x);
         const dy = Math.sign(game.player.y - enemy.y);
 
@@ -389,7 +477,6 @@ function adaptMaze() {
                 const wasWall = cell.type === 'wall';
                 cell.type = wasWall ? 'empty' : 'wall';
 
-                // Verify path still exists
                 const testPath = aStarPath({ x: game.player.x, y: game.player.y }, game.exit);
                 if (testPath.length === 0) {
                     cell.type = wasWall ? 'wall' : 'empty';
@@ -449,7 +536,7 @@ function findEmptyCell() {
 
 // === PLAYER ===
 function movePlayer(dx, dy) {
-    if (game.inLevelTransition) return; // FIX: Prevent movement during level transition
+    if (game.inLevelTransition) return;
 
     const newX = game.player.x + dx;
     const newY = game.player.y + dy;
@@ -460,14 +547,11 @@ function movePlayer(dx, dy) {
         game.history.push({ dx, dy });
         if (game.history.length > 20) game.history.shift();
 
-        playSound(200 + Math.random() * 100, 'square', 0.05, 0.1);
+        playSound('move');
 
-        // Check win
         if (newX === game.exit.x && newY === game.exit.y) {
             levelComplete();
         }
-    } else {
-        playSound(100, 'sawtooth', 0.1, 0.15);
     }
 }
 
@@ -475,6 +559,30 @@ function isValid(x, y) {
     return x >= 0 && x < CONFIG.GRID_SIZE &&
         y >= 0 && y < CONFIG.GRID_SIZE &&
         game.grid[y][x].type === 'empty';
+}
+
+// === COMBO SYSTEM ===
+function addCombo() {
+    game.combo++;
+    if (game.combo > game.maxCombo) game.maxCombo = game.combo;
+
+    if (game.combo > 2) {
+        showComboPopup('x' + game.combo + ' COMBO!');
+        playSound('combo');
+    }
+
+    if (game.comboTimer) clearTimeout(game.comboTimer);
+    game.comboTimer = setTimeout(() => {
+        game.combo = 1;
+    }, CONFIG.COMBO_TIMEOUT);
+}
+
+function showComboPopup(text) {
+    elements.comboPopup.textContent = text;
+    elements.comboPopup.classList.add('show');
+    setTimeout(() => {
+        elements.comboPopup.classList.remove('show');
+    }, 1000);
 }
 
 // === COLLISIONS ===
@@ -486,26 +594,28 @@ function checkCollisions() {
             if (p.type === 'health') {
                 game.health = Math.min(100, game.health + 20);
                 showMessage('+20 HP');
-                playSound(600, 'sine', 0.2);
+                playSound('collect');
             } else {
-                game.score += 100;
-                showMessage('+100');
-                playSound(800, 'sine', 0.2);
+                const points = 100 * game.combo;
+                game.score += points;
+                showMessage('+' + points);
+                playSound('collect');
             }
+            addCombo();
             spawnParticles(p.x, p.y, 'collect', 15);
             game.powerups.splice(i, 1);
         }
     }
 
-    // Enemies (improved collision)
+    // Enemies
     game.enemies.forEach(e => {
         const dist = Math.hypot(e.vx - game.player.vx, e.vy - game.player.vy);
         if (dist < 0.7) {
-            // Only damage when enemy is very close
-            if (game.tickCount % 30 === 0) { // Damage every half second
+            if (game.tickCount % 30 === 0) {
                 game.health -= CONFIG.ENEMY_ATTACK_DAMAGE;
-                playSound(150, 'sawtooth', 0.15, 0.2);
+                playSound('damage');
                 spawnParticles(game.player.vx, game.player.vy, 'damage', 10);
+                game.combo = 1; // Reset combo on damage
 
                 if (game.health <= 0) {
                     gameOver();
@@ -520,13 +630,11 @@ function useAbility() {
     if (game.abilityCharge >= 100) {
         game.abilityCharge = 0;
         showMessage('NEURAL PULSE!');
-        playSound(400, 'sawtooth', 0.5, 0.4);
+        playSound('pulse');
 
-        // Visual effect
         elements.pulseEffect.classList.add('active');
         setTimeout(() => elements.pulseEffect.classList.remove('active'), 600);
 
-        // Push enemies away
         game.enemies.forEach(e => {
             const dx = e.x - game.player.x;
             const dy = e.y - game.player.y;
@@ -537,7 +645,6 @@ function useAbility() {
                 const newX = e.x + Math.sign(dx) * pushDist;
                 const newY = e.y + Math.sign(dy) * pushDist;
 
-                // Clamp and validate
                 const finalX = Math.max(1, Math.min(CONFIG.GRID_SIZE - 2, newX));
                 const finalY = Math.max(1, Math.min(CONFIG.GRID_SIZE - 2, newY));
 
@@ -551,7 +658,7 @@ function useAbility() {
         });
     } else {
         showMessage('CHARGING...');
-        playSound(200, 'sine', 0.1);
+        playSound('move');
     }
 }
 
@@ -595,15 +702,15 @@ function updateParticles() {
 
 // === LEVEL/GAME END ===
 function levelComplete() {
-    if (game.inLevelTransition) return; // FIX: Prevent double trigger
+    if (game.inLevelTransition) return;
 
     game.inLevelTransition = true;
     game.level++;
-    game.score += 500;
+    game.score += 500 * game.combo;
     game.difficulty += 0.5;
 
     showMessage('SECTOR CLEARED!');
-    playSound(1200, 'triangle', 0.5);
+    playSound('levelComplete');
     spawnParticles(game.exit.x, game.exit.y, 'victory', 30);
 
     setTimeout(() => {
@@ -615,8 +722,9 @@ function gameOver() {
     game.status = 'gameover';
     elements.finalScore.textContent = Math.floor(game.score);
     elements.finalLevel.textContent = game.level;
+    elements.finalCombo.textContent = 'x' + game.maxCombo;
     elements.gameoverTitle.textContent = 'SYSTEM FAILURE';
-    playSound(200, 'sawtooth', 1.0, 0.3);
+    playSound('gameOver');
     showOverlay(elements.gameoverScreen);
 }
 
@@ -627,6 +735,8 @@ function resizeCanvas() {
     const size = Math.min(container.clientWidth, container.clientHeight) - 20;
     canvas.width = size;
     canvas.height = size;
+    minimap.width = 140;
+    minimap.height = 140;
 }
 
 function getThemeColors() {
@@ -639,8 +749,7 @@ function getThemeColors() {
             exit: '#00f3ff',
             player: '#00f3ff',
             enemy: '#ff0055',
-            healthPowerup: '#ff0055',
-            scorePowerup: '#ffee00',
+            healthPowerup: '#ff0055', scorePowerup: '#ffee00',
             particle: '#00f3ff'
         },
         arcade: {
@@ -662,9 +771,9 @@ function getThemeColors() {
             wallBorder: '#444444',
             exit: '#ffffff',
             player: '#ffffff',
-            enemy: '#cccccc',
-            healthPowerup: '#888888',
-            scorePowerup: '#aaaaaa',
+            enemy: '#888888',
+            healthPowerup: '#ffffff',  // Changed to white
+            scorePowerup: '#cccccc',   // Changed to lighter gray
             particle: '#ffffff'
         }
     };
@@ -677,11 +786,9 @@ function render() {
     const cellSize = size / CONFIG.GRID_SIZE;
     const colors = getThemeColors();
 
-    // Clear
     ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, size, size);
 
-    // Grid
     ctx.strokeStyle = colors.grid;
     ctx.lineWidth = 1;
     for (let i = 0; i <= CONFIG.GRID_SIZE; i++) {
@@ -695,7 +802,6 @@ function render() {
         ctx.stroke();
     }
 
-    // Walls
     for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
         for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
             if (game.grid[y][x].type === 'wall') {
@@ -712,7 +818,6 @@ function render() {
         }
     }
 
-    // Exit
     ctx.strokeStyle = colors.exit;
     ctx.lineWidth = 3;
     const exitPulse = Math.sin(game.tickCount * 0.1) * 3;
@@ -725,26 +830,43 @@ function render() {
         Math.PI * 2
     );
     ctx.stroke();
-
     ctx.fillStyle = colors.exit + '33';
     ctx.fill();
 
-    // Powerups
+    // IMPROVED NOIR POWERUPS - Different shapes
     game.powerups.forEach(p => {
-        ctx.fillStyle = p.type === 'health' ? colors.healthPowerup : colors.scorePowerup;
+        const px = p.x * cellSize + cellSize / 2;
+        const py = p.y * cellSize + cellSize / 2;
         const powerupPulse = Math.sin(game.tickCount * 0.15) * 2;
-        ctx.beginPath();
-        ctx.arc(
-            p.x * cellSize + cellSize / 2,
-            p.y * cellSize + cellSize / 2,
-            cellSize / 5 + powerupPulse,
-            0,
-            Math.PI * 2
-        );
-        ctx.fill();
+        const radius = cellSize / 5 + powerupPulse;
+
+        ctx.fillStyle = p.type === 'health' ? colors.healthPowerup : colors.scorePowerup;
+
+        if (currentTheme === 'noir') {
+            // Health = Plus sign, Score = Diamond
+            ctx.beginPath();
+            if (p.type === 'health') {
+                // Plus sign
+                const size = radius * 0.7;
+                ctx.fillRect(px - size / 4, py - size, size / 2, size * 2);
+                ctx.fillRect(px - size, py - size / 4, size * 2, size / 2);
+            } else {
+                // Diamond
+                ctx.moveTo(px, py - radius);
+                ctx.lineTo(px + radius, py);
+                ctx.lineTo(px, py + radius);
+                ctx.lineTo(px - radius, py);
+                ctx.closePath();
+            }
+            ctx.fill();
+        } else {
+            // Other themes - simple circles
+            ctx.beginPath();
+            ctx.arc(px, py, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
     });
 
-    // Particles
     game.particles.forEach(p => {
         ctx.globalAlpha = p.life;
         const particleColors = {
@@ -764,7 +886,6 @@ function render() {
     });
     ctx.globalAlpha = 1;
 
-    // Enemies
     game.enemies.forEach(e => {
         ctx.fillStyle = colors.enemy;
         ctx.beginPath();
@@ -772,7 +893,6 @@ function render() {
         const ey = e.vy * cellSize + cellSize / 2;
         const er = cellSize / 3.5;
 
-        // Diamond shape
         ctx.moveTo(ex, ey - er);
         ctx.lineTo(ex + er, ey);
         ctx.lineTo(ex, ey + er);
@@ -780,14 +900,12 @@ function render() {
         ctx.closePath();
         ctx.fill();
 
-        // Glow
         ctx.shadowBlur = 10;
         ctx.shadowColor = colors.enemy;
         ctx.fill();
         ctx.shadowBlur = 0;
     });
 
-    // Player
     ctx.fillStyle = colors.player;
     ctx.shadowBlur = 15;
     ctx.shadowColor = colors.player;
@@ -802,7 +920,6 @@ function render() {
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // Ability charge indicator
     if (game.abilityCharge >= 100) {
         ctx.strokeStyle = '#bd00ff';
         ctx.lineWidth = 2;
@@ -819,12 +936,43 @@ function render() {
     }
 }
 
+// === MINIMAP ===
+function renderMinimap() {
+    const size = 140;
+    const cellSize = size / CONFIG.GRID_SIZE;
+    const colors = getThemeColors();
+
+    minimapCtx.fillStyle = colors.bg;
+    minimapCtx.fillRect(0, 0, size, size);
+
+    for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
+        for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
+            if (game.grid[y][x].type === 'wall') {
+                minimapCtx.fillStyle = colors.wall;
+                minimapCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+            }
+        }
+    }
+
+    minimapCtx.fillStyle = colors.exit;
+    minimapCtx.fillRect(game.exit.x * cellSize, game.exit.y * cellSize, cellSize, cellSize);
+
+    game.enemies.forEach(e => {
+        minimapCtx.fillStyle = colors.enemy;
+        minimapCtx.fillRect(e.x * cellSize, e.y * cellSize, cellSize, cellSize);
+    });
+
+    minimapCtx.fillStyle = colors.player;
+    minimapCtx.fillRect(game.player.x * cellSize, game.player.y * cellSize, cellSize, cellSize);
+}
+
 // === UI ===
 function updateUI() {
     elements.hpDisplay.textContent = Math.floor(game.health);
     elements.scoreDisplay.textContent = Math.floor(game.score);
     elements.levelDisplay.textContent = game.level;
     elements.abilityDisplay.textContent = Math.floor(game.abilityCharge);
+    elements.comboDisplay.textContent = 'x' + game.combo;
 
     elements.hpBar.style.width = Math.max(0, game.health) + '%';
     elements.abilityBar.style.width = Math.max(0, game.abilityCharge) + '%';
@@ -844,4 +992,7 @@ function showOverlay(el) {
 
 function hideOverlay(el) {
     el.classList.remove('active');
+    if (el === elements.startScreen && game.status === 'playing') {
+        game.paused = false; // Unpause when closing settings
+    }
 }

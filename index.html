@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PROTOCOL: ADAPT</title>
+    <link rel="icon" type="image/x-icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%2300f3ff' x='10' y='10' width='80' height='80'/><rect fill='%23ff0055' x='30' y='30' width='40' height='40'/></svg>">
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
         rel="stylesheet">
@@ -65,9 +67,12 @@
                     </ul>
                 </div>
                 <div class="manual-section">
-                    <h3>ADAPTIVE AI</h3>
-                    <p>Enemies use A* pathfinding and adapt to your movement patterns. The maze itself evolves over time
-                        based on your behavior.</p>
+                    <h3>FEATURES</h3>
+                    <ul>
+                        <li><span class="icon">🎮</span> Combo multiplier for fast collection</li>
+                        <li><span class="icon">🗺️</span> Mini-map shows full maze</li>
+                        <li><span class="icon">🧠</span> Enemies use A* pathfinding</li>
+                    </ul>
                 </div>
             </div>
             <button id="close-help" class="btn-primary">UNDERSTOOD</button>
@@ -87,6 +92,10 @@
                     <span class="stat-label">SECTORS CLEARED:</span>
                     <span class="stat-value" id="final-level">0</span>
                 </div>
+                <div class="stat-row">
+                    <span class="stat-label">MAX COMBO:</span>
+                    <span class="stat-value" id="final-combo">0</span>
+                </div>
             </div>
             <button id="restart-btn" class="btn-primary">REBOOT SYSTEM</button>
         </div>
@@ -102,7 +111,7 @@
             <div class="hud-section left">
                 <div class="logo">
                     <h1>ADAPT</h1>
-                    <span class="version">v6.0</span>
+                    <span class="version">v6.1</span>
                 </div>
             </div>
 
@@ -124,6 +133,12 @@
                             <div class="stat-bar">
                                 <div class="bar-fill ability-bar" id="ability-bar"></div>
                             </div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">COMBO</span>
+                        <div class="value-wrapper">
+                            <span class="value combo" id="combo-display">x1</span>
                         </div>
                     </div>
                 </div>
@@ -148,7 +163,13 @@
         <div class="game-area">
             <canvas id="canvas"></canvas>
             <div id="message" class="message-display"></div>
+            <div id="combo-popup" class="combo-popup"></div>
             <div id="pulse-effect" class="pulse-effect"></div>
+
+            <!-- Mini-map -->
+            <div class="minimap-container">
+                <canvas id="minimap"></canvas>
+            </div>
         </div>
 
         <div class="footer-controls desktop-only">
