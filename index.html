@@ -6,22 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PROTOCOL: ADAPT</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Sci-Fi Font -->
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
 
-<body>
+<body data-theme="cyberpunk">
 
-    <!-- UI Overlays -->
-    <div id="start-screen" class="ui-overlay active">
+    <!-- Start Screen -->
+    <div id="start-screen" class="overlay active">
         <div class="panel">
             <h1>PROTOCOL: <span class="highlight">ADAPT</span></h1>
-            <p class="mission-brief">OBJECTIVE: SURVIVE THE ADAPTIVE MAZE.</p>
-            <div class="menu-controls">
-                <button id="start-btn" class="cyber-btn">INITIALIZE</button>
-                <button id="help-btn" class="cyber-btn sm">?</button>
-            </div>
-            <div class="theme-select">
+            <p class="brief">SURVIVE THE ADAPTIVE MAZE</p>
+            <button id="start-btn" class="btn-main">START</button>
+            <button id="help-btn" class="btn-secondary">HELP</button>
+            <div class="theme-picker">
                 <span>THEME:</span>
                 <button class="theme-btn active" data-theme="cyberpunk">CYBER</button>
                 <button class="theme-btn" data-theme="arcade">ARCADE</button>
@@ -30,108 +27,82 @@
         </div>
     </div>
 
-    <!-- Help Modal -->
-    <div id="help-screen" class="ui-overlay hidden">
+    <!-- Help Screen -->
+    <div id="help-screen" class="overlay">
         <div class="panel">
-            <h2>SYSTEM MANUAL</h2>
+            <h2>HOW TO PLAY</h2>
             <ul class="help-list">
-                <li><span class="icon">✛</span> <strong>WASD / ARROWS</strong> to Move</li>
-                <li><span class="icon">⚡</span> <strong>SPACE</strong> to use ABILITY (Stun)</li>
-                <li><span class="icon">◆</span> Avoid <strong>ENEMIES</strong></li>
-                <li><span class="icon">●</span> Collect <strong>DATA</strong> for Score</li>
-                <li><span class="icon">◎</span> Reach <strong>EXIT</strong> to Advance</li>
+                <li>🎯 Use WASD or Arrow Keys to move</li>
+                <li>⚡ Press SPACE for special ability</li>
+                <li>🔴 Avoid red enemies</li>
+                <li>💎 Collect yellow powerups</li>
+                <li>🎯 Reach the cyan exit</li>
             </ul>
-            <button id="close-help-btn" class="cyber-btn">ACKNOWLEDGE</button>
+            <button id="close-help" class="btn-main">GOT IT</button>
         </div>
     </div>
 
-    <div id="game-over-screen" class="ui-overlay hidden">
+    <!-- Game Over Screen -->
+    <div id="gameover-screen" class="overlay">
         <div class="panel">
-            <h1 id="go-title">SYSTEM FAILURE</h1>
-            <div class="stats-summary">
-                <p>FINAL SCORE: <span id="final-score" class="highlight">0</span></p>
-                <p>SECTOR REACHED: <span id="final-level" class="highlight">1</span></p>
-            </div>
-            <button id="restart-btn" class="cyber-btn">REBOOT SYSTEM</button>
+            <h1 id="gameover-title">GAME OVER</h1>
+            <p>Score: <span id="final-score">0</span></p>
+            <p>Level: <span id="final-level">0</span></p>
+            <button id="restart-btn" class="btn-main">RESTART</button>
         </div>
     </div>
 
-    <!-- CRT Screen Effect Overlay -->
+    <!-- Effects -->
     <div class="scanlines"></div>
     <div class="vignette"></div>
 
-    <div class="main-interface blur-target">
-        <header class="hud-header">
-            <div class="logo-area">
-                <div class="logo-glitch" data-text="ADAPT">PROTOCOL: ADAPT</div>
-                <div class="actions-area">
-                    <button id="ingame-help" class="icon-btn">⚙</button>
-                    <!-- <button id="mute-toggle" class="icon-btn">🔊</button> -->
+    <!-- Game Interface -->
+    <div id="game-interface" class="game-interface">
+        <div class="hud">
+            <div class="hud-left">
+                <h2>PROTOCOL: ADAPT</h2>
+            </div>
+            <div class="hud-right">
+                <div class="stat">
+                    <span class="label">HP</span>
+                    <span class="value" id="hp-display">100</span>
+                </div>
+                <div class="stat">
+                    <span class="label">SCORE</span>
+                    <span class="value" id="score-display">0</span>
+                </div>
+                <div class="stat">
+                    <span class="label">LEVEL</span>
+                    <span class="value" id="level-display">1</span>
                 </div>
             </div>
-
-            <div class="hud-stats">
-                <div class="stat-unit">
-                    <div class="label">INTEGRITY</div>
-                    <div class="bar-container">
-                        <div class="value health-color" id="health-value">100</div>
-                        <div class="bar-bg">
-                            <div id="health-bar" class="bar-fill"></div>
-                        </div>
-                    </div>
-                </div>
-                <!-- Ability Cooldown UI -->
-                <div class="stat-unit">
-                    <div class="label">ABILITY</div>
-                    <div class="bar-container">
-                        <div class="value ability-color" id="ability-status">READY</div>
-                        <div class="bar-bg">
-                            <div id="ability-bar" class="bar-fill ability-fill"></div>
-                        </div>
-                    </div>
-                </div>
-                <!-- Hidden on mobile to save space -->
-                <div class="stat-unit mobile-hide">
-                    <div class="label">SECTOR</div>
-                    <div class="value level-color" id="level-value">1</div>
-                </div>
-            </div>
-        </header>
-
-        <!-- The Game Area -->
-        <div class="canvas-wrapper">
-            <!-- Decorative Tech Brackets -->
-            <div class="corner-bracket top-left"></div>
-            <div class="corner-bracket top-right"></div>
-            <div class="corner-bracket bottom-left"></div>
-            <div class="corner-bracket bottom-right"></div>
-            <div class="grid-overlay"></div>
-
-            <canvas id="gameCanvas"></canvas>
-
-            <!-- Message Overlay -->
-            <div id="message" class="message-overlay hidden">SYSTEM READY</div>
         </div>
 
-        <div class="controls-legend desktop-only">
-            <div class="key-group"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span
-                    class="key">D</span></div>
-            <span class="instruction">MOVE</span>
-            <div class="key-group"><span class="key wide">SPACE</span></div>
-            <span class="instruction">PULSE</span>
+        <div class="game-area">
+            <canvas id="canvas"></canvas>
+            <div id="message" class="message"></div>
         </div>
 
-        <!-- Mobile Controls -->
-        <div class="mobile-controls touch-only">
+        <div class="controls desktop-only">
+            <span class="key">W</span>
+            <span class="key">A</span>
+            <span class="key">S</span>
+            <span class="key">D</span>
+            <span class="sep">•</span>
+            <span class="key wide">SPACE</span>
+        </div>
+
+        <!-- Mobile D-Pad -->
+        <div class="mobile-controls">
             <div class="dpad">
-                <button id="btn-up" class="dpad-btn up">▲</button>
-                <div class="dpad-middle">
-                    <button id="btn-left" class="dpad-btn left">◀</button>
-                    <button id="btn-down" class="dpad-btn down">▼</button>
-                    <button id="btn-right" class="dpad-btn right">▶</button>
+                <button class="dpad-btn" data-dir="up">▲</button>
+                <div class="dpad-row">
+                    <button class="dpad-btn" data-dir="left">◀</button>
+                    <button class="dpad-btn" data-dir="down">▼</button>
+                    <button class="dpad-btn" data-dir="right">▶</button>
                 </div>
             </div>
-            <button id="btn-ability" class="action-btn">⚡</button>
+            <button id="ability-btn" class="ability-btn">⚡</button>
         </div>
     </div>
 
