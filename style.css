@@ -450,14 +450,26 @@ canvas {
 }
 
 /* Mobile Controls */
+/* Mobile Controls - Overlay Style */
 .mobile-controls {
     display: none;
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    width: 100%;
+    padding: 0 40px;
+    z-index: 200;
+    pointer-events: none;
+    /* Let clicks pass through empty space */
 }
 
-/* Default hidden */
+.mobile-controls>* {
+    pointer-events: auto;
+    /* Re-enable for buttons */
+}
 
 @media (hover: none) and (pointer: coarse),
-(max-width: 768px) {
+(max-width: 800px) {
     .desktop-only {
         display: none !important;
     }
@@ -466,18 +478,19 @@ canvas {
         display: none !important;
     }
 
-    .main-interface {
-        padding: 10px;
-        gap: 10px;
+    .hud-header {
+        padding-bottom: 5px;
+        align-items: center;
+    }
+
+    .logo-glitch {
+        font-size: 1.5rem;
     }
 
     .mobile-controls {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        width: 100%;
-        height: 140px;
-        padding: 10px 20px;
+        align-items: flex-end;
     }
 
     .dpad {
@@ -485,6 +498,10 @@ canvas {
         flex-direction: column;
         align-items: center;
         gap: 5px;
+        backdrop-filter: blur(2px);
+        padding: 10px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.2);
     }
 
     .dpad-middle {
@@ -494,8 +511,8 @@ canvas {
 
     .dpad-btn,
     .action-btn {
-        width: 50px;
-        height: 50px;
+        width: 45px;
+        height: 45px;
         background: rgba(255, 255, 255, 0.1);
         border: 1px solid var(--text-dim);
         color: var(--text-primary);
@@ -505,6 +522,7 @@ canvas {
         justify-content: center;
         align-items: center;
         -webkit-tap-highlight-color: transparent;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
     }
 
     .dpad-btn:active,
@@ -515,12 +533,13 @@ canvas {
     }
 
     .action-btn {
-        width: 70px;
-        height: 70px;
+        width: 65px;
+        height: 65px;
         border-radius: 50%;
         border-color: var(--accent-ability);
         color: var(--accent-ability);
         font-size: 2rem;
+        background: rgba(0, 0, 0, 0.3);
     }
 
     body[data-theme="arcade"] .dpad-btn {

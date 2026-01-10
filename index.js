@@ -61,8 +61,15 @@ function initUI() {
 
     // Help System
     const helpModal = document.getElementById('help-screen');
+    const startScreen = document.getElementById('start-screen');
+
     document.getElementById('help-btn').addEventListener('click', () => helpModal.classList.add('active'));
-    document.getElementById('ingame-help').addEventListener('click', () => helpModal.classList.add('active'));
+    document.getElementById('ingame-help').addEventListener('click', () => {
+        // Show start screen as "Pause/Settings" menu
+        startScreen.classList.add('active');
+        document.getElementById('start-btn').textContent = "RESUME";
+    });
+
     document.getElementById('close-help-btn').addEventListener('click', () => {
         helpModal.classList.remove('active');
         helpModal.classList.add('hidden');
