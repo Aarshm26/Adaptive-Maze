@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,23 +9,49 @@
     <!-- Sci-Fi Font -->
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
+
 <body>
+
+    <!-- UI Overlays -->
+    <div id="start-screen" class="ui-overlay active">
+        <div class="panel">
+            <h1>PROTOCOL: <span class="highlight">ADAPT</span></h1>
+            <p class="mission-brief">OBJECTIVE: SURVIVE THE ADAPTIVE MAZE.</p>
+            <button id="start-btn" class="cyber-btn">INITIALIZE SEQUENCE</button>
+        </div>
+    </div>
+
+    <div id="game-over-screen" class="ui-overlay hidden">
+        <div class="panel">
+            <h1 id="go-title">SYSTEM FAILURE</h1>
+            <div class="stats-summary">
+                <p>FINAL SCORE: <span id="final-score" class="highlight">0</span></p>
+                <p>SECTOR REACHED: <span id="final-level" class="highlight">1</span></p>
+            </div>
+            <button id="restart-btn" class="cyber-btn">REBOOT SYSTEM</button>
+        </div>
+    </div>
 
     <!-- CRT Screen Effect Overlay -->
     <div class="scanlines"></div>
-    
-    <div class="main-interface">
+    <div class="vignette"></div>
+
+    <div class="main-interface blur-target">
         <header class="hud-header">
             <div class="logo-area">
-                <h1>PROTOCOL: <span class="highlight">ADAPT</span></h1>
-                <div class="subtitle">AI SURVIVAL SIMULATION // v2.0</div>
+                <div class="logo-glitch" data-text="ADAPT">PROTOCOL: ADAPT</div>
+                <div class="subtitle">AI SURVIVAL SIMULATION // v3.0</div>
             </div>
-            
+
             <div class="hud-stats">
                 <div class="stat-unit">
                     <div class="label">INTEGRITY</div>
-                    <div class="value health-color" id="health-value">100</div>
-                    <div class="bar-bg"><div id="health-bar" class="bar-fill"></div></div>
+                    <div class="bar-container">
+                        <div class="value health-color" id="health-value">100</div>
+                        <div class="bar-bg">
+                            <div id="health-bar" class="bar-fill"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="stat-unit">
                     <div class="label">DATA</div>
@@ -44,19 +71,22 @@
             <div class="corner-bracket top-right"></div>
             <div class="corner-bracket bottom-left"></div>
             <div class="corner-bracket bottom-right"></div>
-            
+            <div class="grid-overlay"></div>
+
             <canvas id="gameCanvas"></canvas>
-            
+
             <!-- Message Overlay -->
             <div id="message" class="message-overlay hidden">SYSTEM READY</div>
         </div>
 
         <div class="controls-legend">
-            <span class="key">WASD / ARROWS</span>
+            <div class="key-group"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span
+                    class="key">D</span></div>
             <span class="instruction">TO NAVIGATE</span>
         </div>
     </div>
 
     <script src="index.js"></script>
 </body>
+
 </html>
