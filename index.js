@@ -839,229 +839,236 @@ function render() {
 
     ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, size, size);
+    function render() {
+        const size = canvas.width;
+        const cellSize = size / CONFIG.GRID_SIZE;
+        const colors = getThemeColors();
 
-    ctx.strokeStyle = colors.grid;
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= CONFIG.GRID_SIZE; i++) {
-        ctx.beginPath();
-        ctx.moveTo(i * cellSize, 0);
-        ctx.lineTo(i * cellSize, size);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(0, i * cellSize);
-        ctx.lineTo(size, i * cellSize);
-        ctx.stroke();
-    }
+        ctx.fillStyle = colors.bg;
+        ctx.fillRect(0, 0, size, size);
 
-    for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
-        for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
-            if (game.grid[y][x].type === 'wall') {
-                const px = x * cellSize;
-                const py = y * cellSize;
+        ctx.strokeStyle = colors.grid;
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= CONFIG.GRID_SIZE; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i * cellSize, 0);
+            ctx.lineTo(i * cellSize, size);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0, i * cellSize);
+            ctx.lineTo(size, i * cellSize);
+            ctx.stroke();
+        }
 
-                ctx.fillStyle = colors.wall;
-                ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+        for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
+            for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
+                if (game.grid[y][x].type === 'wall') {
+                    const px = x * cellSize;
+                    const py = y * cellSize;
 
-                ctx.strokeStyle = colors.wallBorder;
-                ctx.lineWidth = 1;
-                ctx.strokeRect(px + 3, py + 3, cellSize - 6, cellSize - 6);
+                    ctx.fillStyle = colors.wall;
+                    ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+
+                    ctx.strokeStyle = colors.wallBorder;
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(px + 3, py + 3, cellSize - 6, cellSize - 6);
+                }
             }
         }
-    }
 
-    ctx.strokeStyle = colors.exit;
-    ctx.lineWidth = 3;
-    const exitPulse = Math.sin(game.tickCount * 0.1) * 3;
-    ctx.beginPath();
-    ctx.arc(
-        game.exit.x * cellSize + cellSize / 2,
-        game.exit.y * cellSize + cellSize / 2,
-        cellSize / 3 + exitPulse,
-        0,
-        Math.PI * 2
-    );
-    ctx.stroke();
-    ctx.fillStyle = colors.exit + '33';
-    ctx.fill();
-
-    // IMPROVED NOIR POWERUPS - Different shapes
-    game.powerups.forEach(p => {
-        const px = p.x * cellSize + cellSize / 2;
-        const py = p.y * cellSize + cellSize / 2;
-        const powerupPulse = Math.sin(game.tickCount * 0.15) * 2;
-        const radius = cellSize / 5 + powerupPulse;
-
-        ctx.fillStyle = p.type === 'health' ? colors.healthPowerup : colors.scorePowerup;
-
-        if (currentTheme === 'noir') {
-            // Health = Plus sign, Score = Diamond
-            ctx.beginPath();
-            if (p.type === 'health') {
-                // Plus sign
-                const size = radius * 0.7;
-                ctx.fillRect(px - size / 4, py - size, size / 2, size * 2);
-                ctx.fillRect(px - size, py - size / 4, size * 2, size / 2);
-            } else {
-                // Diamond
-                ctx.moveTo(px, py - radius);
-                ctx.lineTo(px + radius, py);
-                ctx.lineTo(px, py + radius);
-                ctx.lineTo(px - radius, py);
-                ctx.closePath();
-            }
-            ctx.fill();
-        } else {
-            // Other themes - simple circles
-            ctx.beginPath();
-            ctx.arc(px, py, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    });
-
-    game.particles.forEach(p => {
-        ctx.globalAlpha = p.life;
-        const particleColors = {
-            collect: colors.scorePowerup,
-            damage: colors.enemy,
-            pulse: '#bd00ff',
-            adapt: colors.particle,
-            victory: colors.exit
-        };
-        ctx.fillStyle = particleColors[p.type] || colors.particle;
-        ctx.fillRect(
-            p.x * cellSize - p.size * cellSize / 2,
-            p.y * cellSize - p.size * cellSize / 2,
-            p.size * cellSize,
-            p.size * cellSize
-        );
-    });
-    ctx.globalAlpha = 1;
-
-    game.enemies.forEach(e => {
-        ctx.fillStyle = colors.enemy;
-        ctx.beginPath();
-        const ex = e.vx * cellSize + cellSize / 2;
-        const ey = e.vy * cellSize + cellSize / 2;
-        const er = cellSize / 3.5;
-
-        ctx.moveTo(ex, ey - er);
-        ctx.lineTo(ex + er, ey);
-        ctx.lineTo(ex, ey + er);
-        ctx.lineTo(ex - er, ey);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = colors.enemy;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-    });
-
-    ctx.fillStyle = colors.player;
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = colors.player;
-    ctx.beginPath();
-    ctx.arc(
-        game.player.vx * cellSize + cellSize / 2,
-        game.player.vy * cellSize + cellSize / 2,
-        cellSize / 3.5,
-        0,
-        Math.PI * 2
-    );
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    if (game.abilityCharge >= 100) {
-        ctx.strokeStyle = '#bd00ff';
-        ctx.lineWidth = 2;
-        const abilityPulse = Math.sin(game.tickCount * 0.2) * 3;
+        ctx.strokeStyle = colors.exit;
+        ctx.lineWidth = 3;
+        const exitPulse = Math.sin(game.tickCount * 0.1) * 3;
         ctx.beginPath();
         ctx.arc(
-            game.player.vx * cellSize + cellSize / 2,
-            game.player.vy * cellSize + cellSize / 2,
-            cellSize / 2.5 + abilityPulse,
+            game.exit.x * cellSize + cellSize / 2,
+            game.exit.y * cellSize + cellSize / 2,
+            cellSize / 3 + exitPulse,
             0,
             Math.PI * 2
         );
         ctx.stroke();
-    }
-}
+        ctx.fillStyle = colors.exit + '33';
+        ctx.fill();
 
-// === MINIMAP ===
-function renderMinimap() {
-    const size = 140;
-    const cellSize = size / CONFIG.GRID_SIZE;
-    const colors = getThemeColors();
+        // IMPROVED NOIR POWERUPS - Different shapes
+        game.powerups.forEach(p => {
+            const px = p.x * cellSize + cellSize / 2;
+            const py = p.y * cellSize + cellSize / 2;
+            const powerupPulse = Math.sin(game.tickCount * 0.15) * 2;
+            const radius = cellSize / 5 + powerupPulse;
 
-    minimapCtx.fillStyle = colors.bg;
-    minimapCtx.fillRect(0, 0, size, size);
+            ctx.fillStyle = p.type === 'health' ? colors.healthPowerup : colors.scorePowerup;
 
-    for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
-        for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
-            if (game.grid[y][x].type === 'wall') {
-                minimapCtx.fillStyle = colors.wall;
-                minimapCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+            if (currentTheme === 'noir') {
+                // Health = Plus sign, Score = Diamond
+                ctx.beginPath();
+                if (p.type === 'health') {
+                    // Plus sign
+                    const size = radius * 0.7;
+                    ctx.fillRect(px - size / 4, py - size, size / 2, size * 2);
+                    ctx.fillRect(px - size, py - size / 4, size * 2, size / 2);
+                } else {
+                    // Diamond
+                    ctx.moveTo(px, py - radius);
+                    ctx.lineTo(px + radius, py);
+                    ctx.lineTo(px, py + radius);
+                    ctx.lineTo(px - radius, py);
+                    ctx.closePath();
+                }
+                ctx.fill();
+            } else {
+                // Other themes - simple circles
+                ctx.beginPath();
+                ctx.arc(px, py, radius, 0, Math.PI * 2);
+                ctx.fill();
             }
+        });
+
+        game.particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            const particleColors = {
+                collect: colors.scorePowerup,
+                damage: colors.enemy,
+                pulse: '#bd00ff',
+                adapt: colors.particle,
+                victory: colors.exit
+            };
+            ctx.fillStyle = particleColors[p.type] || colors.particle;
+            ctx.fillRect(
+                p.x * cellSize - p.size * cellSize / 2,
+                p.y * cellSize - p.size * cellSize / 2,
+                p.size * cellSize,
+                p.size * cellSize
+            );
+        });
+        ctx.globalAlpha = 1;
+
+        game.enemies.forEach(e => {
+            ctx.fillStyle = colors.enemy;
+            ctx.beginPath();
+            const ex = e.vx * cellSize + cellSize / 2;
+            const ey = e.vy * cellSize + cellSize / 2;
+            const er = cellSize / 3.5;
+
+            ctx.moveTo(ex, ey - er);
+            ctx.lineTo(ex + er, ey);
+            ctx.lineTo(ex, ey + er);
+            ctx.lineTo(ex - er, ey);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = colors.enemy;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        });
+
+        ctx.fillStyle = colors.player;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = colors.player;
+        ctx.beginPath();
+        ctx.arc(
+            game.player.vx * cellSize + cellSize / 2,
+            game.player.vy * cellSize + cellSize / 2,
+            cellSize / 3.5,
+            0,
+            Math.PI * 2
+        );
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        if (game.abilityCharge >= 100) {
+            ctx.strokeStyle = '#bd00ff';
+            ctx.lineWidth = 2;
+            const abilityPulse = Math.sin(game.tickCount * 0.2) * 3;
+            ctx.beginPath();
+            ctx.arc(
+                game.player.vx * cellSize + cellSize / 2,
+                game.player.vy * cellSize + cellSize / 2,
+                cellSize / 2.5 + abilityPulse,
+                0,
+                Math.PI * 2
+            );
+            ctx.stroke();
         }
     }
 
-    minimapCtx.fillStyle = colors.exit;
-    minimapCtx.fillRect(game.exit.x * cellSize, game.exit.y * cellSize, cellSize, cellSize);
+    // === MINIMAP ===
+    function renderMinimap() {
+        const size = 140;
+        const cellSize = size / CONFIG.GRID_SIZE;
+        const colors = getThemeColors();
 
-    game.enemies.forEach(e => {
-        minimapCtx.fillStyle = colors.enemy;
-        minimapCtx.fillRect(e.x * cellSize, e.y * cellSize, cellSize, cellSize);
-    });
+        minimapCtx.fillStyle = colors.bg;
+        minimapCtx.fillRect(0, 0, size, size);
 
-    minimapCtx.fillStyle = colors.player;
-    minimapCtx.fillRect(game.player.x * cellSize, game.player.y * cellSize, cellSize, cellSize);
-}
+        for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
+            for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
+                if (game.grid[y][x].type === 'wall') {
+                    minimapCtx.fillStyle = colors.wall;
+                    minimapCtx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+        }
 
-// === UI ===
-function updateUI() {
-    elements.hpDisplay.textContent = Math.floor(game.health);
-    elements.scoreDisplay.textContent = Math.floor(game.score);
-    elements.levelDisplay.textContent = game.level;
-    elements.abilityDisplay.textContent = Math.floor(game.abilityCharge);
-    elements.comboDisplay.textContent = 'x' + game.combo;
+        minimapCtx.fillStyle = colors.exit;
+        minimapCtx.fillRect(game.exit.x * cellSize, game.exit.y * cellSize, cellSize, cellSize);
 
-    elements.hpBar.style.width = Math.max(0, game.health) + '%';
-    elements.abilityBar.style.width = Math.max(0, game.abilityCharge) + '%';
-    elements.highscoreDisplay.textContent = Math.floor(game.highScore);
+        game.enemies.forEach(e => {
+            minimapCtx.fillStyle = colors.enemy;
+            minimapCtx.fillRect(e.x * cellSize, e.y * cellSize, cellSize, cellSize);
+        });
 
-}
-
-function showMessage(text) {
-    elements.message.textContent = text;
-    elements.message.classList.add('show');
-    setTimeout(() => {
-        elements.message.classList.remove('show');
-    }, 1500);
-}
-
-function showOverlay(el) {
-    el.classList.add('active');
-}
-
-function hideOverlay(el) {
-    el.classList.remove('active');
-    if (el === elements.startScreen && game.status === 'playing') {
-        game.paused = false; // Unpause when closing settings
+        minimapCtx.fillStyle = colors.player;
+        minimapCtx.fillRect(game.player.x * cellSize, game.player.y * cellSize, cellSize, cellSize);
     }
-}
 
+    // === UI ===
+    function updateUI() {
+        elements.hpDisplay.textContent = Math.floor(game.health);
+        elements.scoreDisplay.textContent = Math.floor(game.score);
+        elements.levelDisplay.textContent = game.level;
+        elements.abilityDisplay.textContent = Math.floor(game.abilityCharge);
+        elements.comboDisplay.textContent = 'x' + game.combo;
 
-function updateTechnicalHUD() {
-    if (!game.debugMode) return;
-    const now = performance.now();
-    game.lastTick = now;
-    if (game.tickCount % 30 === 0) {
-        const timeDiff = now - game.lastHudUpdate;
-        game.fps = Math.round(30000 / timeDiff);
-        game.lastHudUpdate = now;
-        elements.techFps.textContent = game.fps;
-        elements.techSearch.textContent = game.nodesSearched;
-        elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length + game.particles.length;
+        elements.hpBar.style.width = Math.max(0, game.health) + '%';
+        elements.abilityBar.style.width = Math.max(0, game.abilityCharge) + '%';
+        elements.highscoreDisplay.textContent = Math.floor(game.highScore);
+
     }
-    if (game.tickCount % 120 === 0) game.nodesSearched = 0;
-}
+
+    function showMessage(text) {
+        elements.message.textContent = text;
+        elements.message.classList.add('show');
+        setTimeout(() => {
+            elements.message.classList.remove('show');
+        }, 1500);
+    }
+
+    function showOverlay(el) {
+        el.classList.add('active');
+    }
+
+    function hideOverlay(el) {
+        el.classList.remove('active');
+        if (el === elements.startScreen && game.status === 'playing') {
+            game.paused = false; // Unpause when closing settings
+        }
+    }
+
+
+    function updateTechnicalHUD() {
+        if (!game.debugMode) return;
+        const now = performance.now();
+        game.lastTick = now;
+        if (game.tickCount % 30 === 0) {
+            const timeDiff = now - game.lastHudUpdate;
+            game.fps = Math.round(30000 / timeDiff);
+            game.lastHudUpdate = now;
+            elements.techFps.textContent = game.fps;
+            elements.techSearch.textContent = game.nodesSearched;
+            elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length + game.particles.length;
+        }
+        if (game.tickCount % 120 === 0) game.nodesSearched = 0;
+    }
