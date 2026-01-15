@@ -1,4 +1,4 @@
-const CACHE_NAME = 'adapt-maze-v2';
+const CACHE_NAME = 'adapt-maze-v3';
 const ASSETS = [
     './',
     './index.html',

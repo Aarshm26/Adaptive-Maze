@@ -1063,4 +1063,3 @@ function updateTechnicalHUD() {
     }
     if (game.tickCount % 120 === 0) game.nodesSearched = 0;
 }
-}
