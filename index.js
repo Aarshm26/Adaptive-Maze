@@ -1049,7 +1049,7 @@ function hideOverlay(el) {
         game.paused = false; // Unpause when closing settings
     }
 }
-}
+
 
 function updateTechnicalHUD() {
     if (!game.debugMode) return;
