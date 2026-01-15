@@ -327,23 +327,7 @@ function gameLoop(timestamp) {
     render();
     renderMinimap();
 
-    // Technical HUD reporting logic (real-time, optimized)
-    if (game.debugMode) {
-        const now = performance.now();
-        const delta = now - game.lastTick;
-        game.lastTick = now;
-
-        // Rolling average for FPS (update every 15 frames for stability)
-        if (game.tickCount % 15 === 0) {
-            game.fps = Math.round(1000 / delta);
-            elements.techFps.textContent = game.fps;
-            elements.techSearch.textContent = game.nodesSearched;
-            elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length + game.particles.length;
-        }
-
-        if (game.tickCount % 120 === 0) game.nodesSearched = 0;
-    }
-
+    updateTechnicalHUD();
     updateUI();
 
     if (game.status === 'playing' && !game.paused) {
@@ -1064,4 +1048,20 @@ function hideOverlay(el) {
     if (el === elements.startScreen && game.status === 'playing') {
         game.paused = false; // Unpause when closing settings
     }
+}
+}
+
+function updateTechnicalHUD() {
+    if (!game.debugMode) return;
+    const now = performance.now();
+    game.lastTick = now;
+    if (game.tickCount % 30 === 0) {
+        const timeDiff = now - game.lastHudUpdate;
+        game.fps = Math.round(30000 / timeDiff);
+        game.lastHudUpdate = now;
+        elements.techFps.textContent = game.fps;
+        elements.techSearch.textContent = game.nodesSearched;
+        elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length + game.particles.length;
+    }
+    if (game.tickCount % 120 === 0) game.nodesSearched = 0;
 }
