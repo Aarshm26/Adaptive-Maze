@@ -38,6 +38,7 @@ let game = {
     debugMode: false,
     fps: 0,
     lastTick: performance.now(),
+    lastHudUpdate: performance.now(),
     nodesSearched: 0
 };
 
