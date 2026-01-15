@@ -4,7 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PROTOCOL: ADAPT</title>
+    <title>PROTOCOL: ADAPT | Neural Survival Simulation</title>
+    <meta name="description"
+        content="An adaptive maze game featuring A* pathfinding, neural AI enemies, and Web Audio API synthesis. Challenge your survival instincts.">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="PROTOCOL: ADAPT | Global AI Labyrinth">
+    <meta property="og:description"
+        content="Can you survive the adaptive AI? Play the browser-based neural survival simulation.">
+
+    <!-- PWA -->
+    <meta name="theme-color" content="#00f3ff">
+    <link rel="manifest" href="manifest.json">
+
     <link rel="icon" type="image/x-icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%2300f3ff' x='10' y='10' width='80' height='80'/><rect fill='%23ff0055' x='30' y='30' width='40' height='40'/></svg>">
     <link rel="stylesheet" href="style.css">
@@ -73,6 +86,11 @@
                         <li><span class="icon">🗺️</span> Mini-map shows full maze</li>
                         <li><span class="icon">🧠</span> Enemies use A* pathfinding</li>
                     </ul>
+                </div>
+                <div class="manual-section technical-manual">
+                    <h3>TECHNICAL CORE</h3>
+                    <p>Built with Vanilla JS & Canvas. Uses A* Pathfinding for AI, Web Audio API for procedural
+                        synthesis, and a custom spatial grid for collision optimization.</p>
                 </div>
             </div>
             <button id="close-help" class="btn-primary">UNDERSTOOD</button>
@@ -150,14 +168,26 @@
                     <span class="value score" id="score-display">0</span>
                 </div>
                 <div class="stat-item-simple">
+                    <span class="label">HIGH</span>
+                    <span class="value score" id="highscore-display">0</span>
+                </div>
+                <div class="stat-item-simple">
                     <span class="label">SECTOR</span>
                     <span class="value level" id="level-display">1</span>
                 </div>
                 <div class="hud-actions">
+                    <button id="debug-btn" class="icon-btn" title="Technical Overlay">📊</button>
                     <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
                     <button id="sound-toggle" class="icon-btn" title="Sound">🔊</button>
                 </div>
             </div>
+        </div>
+
+        <!-- Technical Overlay -->
+        <div id="technical-hud" class="technical-hud">
+            <div class="tech-row"><span>FPS:</span> <span id="tech-fps">0</span></div>
+            <div class="tech-row"><span>A* SEARCH:</span> <span id="tech-search">0</span> nodes</div>
+            <div class="tech-row"><span>ENTITIES:</span> <span id="tech-entities">0</span></div>
         </div>
 
         <div class="game-area">

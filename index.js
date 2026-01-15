@@ -17,6 +17,7 @@ let game = {
     status: 'menu',
     level: 1,
     score: 0,
+    highScore: localStorage.getItem('adapt_high_score') || 0,
     health: 100,
     abilityCharge: 100,
     combo: 1,
@@ -33,7 +34,11 @@ let game = {
     difficulty: 1,
     inLevelTransition: false,
     soundEnabled: true,
-    paused: false
+    paused: false,
+    debugMode: false,
+    fps: 0,
+    lastTick: performance.now(),
+    nodesSearched: 0
 };
 
 // === DOM ELEMENTS ===
@@ -148,6 +153,13 @@ function playPulseSound(volume) {
 // === INITIALIZATION ===
 window.addEventListener('load', init);
 
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err));
+    });
+}
+
 function init() {
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d');
@@ -169,10 +181,13 @@ function init() {
         comboDisplay: document.getElementById('combo-display'),
         hpBar: document.getElementById('hp-bar'),
         abilityBar: document.getElementById('ability-bar'),
-        finalScore: document.getElementById('final-score'),
-        finalLevel: document.getElementById('final-level'),
         finalCombo: document.getElementById('final-combo'),
-        gameoverTitle: document.getElementById('gameover-title')
+        gameoverTitle: document.getElementById('gameover-title'),
+        highscoreDisplay: document.getElementById('highscore-display'),
+        techHud: document.getElementById('technical-hud'),
+        techFps: document.getElementById('tech-fps'),
+        techSearch: document.getElementById('tech-search'),
+        techEntities: document.getElementById('tech-entities')
     };
 
     setupEventListeners();
@@ -198,12 +213,14 @@ function setupEventListeners() {
         showOverlay(elements.startScreen);
     });
 
-    // Sound toggle
-    document.getElementById('sound-toggle').addEventListener('click', (e) => {
-        game.soundEnabled = !game.soundEnabled;
-        e.target.textContent = game.soundEnabled ? '🔊' : '🔇';
+    // Debug toggle
+    document.getElementById('debug-btn').addEventListener('click', () => {
+        game.debugMode = !game.debugMode;
+        elements.techHud.style.display = game.debugMode ? 'block' : 'none';
         playSound('move');
     });
+
+    // Sound toggle
 
     // Theme switcher
     document.querySelectorAll('.theme-option').forEach(btn => {
@@ -374,6 +391,7 @@ function aStarPath(start, goal) {
 
         openSet.splice(currentIndex, 1);
         closedSet.push(current);
+        game.nodesSearched++; // Track technical metric
 
         const neighbors = [
             { x: current.x + 1, y: current.y },
@@ -709,6 +727,12 @@ function levelComplete() {
     game.score += 500 * game.combo;
     game.difficulty += 0.5;
 
+    // Persist High Score
+    if (game.score > game.highScore) {
+        game.highScore = game.score;
+        localStorage.setItem('adapt_high_score', game.highScore);
+    }
+
     showMessage('SECTOR CLEARED!');
     playSound('levelComplete');
     spawnParticles(game.exit.x, game.exit.y, 'victory', 30);
@@ -724,6 +748,16 @@ function gameOver() {
     elements.finalLevel.textContent = game.level;
     elements.finalCombo.textContent = 'x' + game.maxCombo;
     elements.gameoverTitle.textContent = 'SYSTEM FAILURE';
+
+    // Persist High Score
+    if (game.score > game.highScore) {
+        game.highScore = game.score;
+        localStorage.setItem('adapt_high_score', game.highScore);
+    }
+
+    // Haptic feedback for game over
+    if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
+
     playSound('gameOver');
     showOverlay(elements.gameoverScreen);
 }
@@ -976,6 +1010,21 @@ function updateUI() {
 
     elements.hpBar.style.width = Math.max(0, game.health) + '%';
     elements.abilityBar.style.width = Math.max(0, game.abilityCharge) + '%';
+    elements.highscoreDisplay.textContent = Math.floor(game.highScore);
+
+    // Update Technical Overlay
+    if (game.debugMode) {
+        const now = performance.now();
+        game.fps = Math.round(1000 / (now - game.lastTick));
+        game.lastTick = now;
+
+        elements.techFps.textContent = game.fps;
+        elements.techSearch.textContent = game.nodesSearched;
+        elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length + game.particles.length;
+
+        // Reset search count periodically for visibility
+        if (game.tickCount % 60 === 0) game.nodesSearched = 0;
+    }
 }
 
 function showMessage(text) {
