@@ -61,39 +61,42 @@
     <!-- Help Screen -->
     <div id="help-screen" class="overlay">
         <div class="panel">
-            <h2>SYSTEM MANUAL</h2>
+            <h1 class="glitch small" data-text="SYSTEM MANUAL">SYSTEM MANUAL</h1>
             <div class="manual-content">
                 <div class="manual-section">
-                    <h3>CONTROLS</h3>
+                    <h3>🕹️ CONTROLS</h3>
                     <ul>
-                        <li><span class="icon">⌨</span> WASD / Arrow Keys - Movement</li>
-                        <li><span class="icon">⚡</span> SPACE - Neural Pulse (stuns enemies)</li>
+                        <li><span class="icon">⌨</span> WASD / Arrows</li>
+                        <li><span class="icon">⚡</span> SPACE (Pulse)</li>
+                    </ul>
+                    <p class="description">Mobile: Use the D-Pad and Thunder button.</p>
+                </div>
+                <div class="manual-section">
+                    <h3>🎯 OBJECTIVES</h3>
+                    <ul>
+                        <li><span class="icon">🏁</span> Reach the Exit</li>
+                        <li><span class="icon">👾</span> Avoid AI Enemies</li>
+                        <li><span class="icon">💊</span> Health (+20 HP)</li>
+                        <li><span class="icon">💎</span> Data (+100 Score)</li>
                     </ul>
                 </div>
                 <div class="manual-section">
-                    <h3>OBJECTIVES</h3>
+                    <h3>🚀 FEATURES</h3>
                     <ul>
-                        <li><span class="icon">🎯</span> Reach the cyan exit portal</li>
-                        <li><span class="icon">👾</span> Avoid adaptive AI enemies</li>
-                        <li><span class="icon">💊</span> Collect health (+20 HP)</li>
-                        <li><span class="icon">💎</span> Collect data (+100 score)</li>
-                    </ul>
-                </div>
-                <div class="manual-section">
-                    <h3>FEATURES</h3>
-                    <ul>
-                        <li><span class="icon">🎮</span> Combo multiplier for fast collection</li>
-                        <li><span class="icon">🗺️</span> Mini-map shows full maze</li>
-                        <li><span class="icon">🧠</span> Enemies use A* pathfinding</li>
+                        <li><span class="icon">🔥</span> Combo Multiplier</li>
+                        <li><span class="icon">🧠</span> Adaptive A* AI</li>
+                        <li><span class="icon">📊</span> Technical HUD</li>
                     </ul>
                 </div>
                 <div class="manual-section technical-manual">
-                    <h3>TECHNICAL CORE</h3>
-                    <p>Built with Vanilla JS & Canvas. Uses A* Pathfinding for AI, Web Audio API for procedural
-                        synthesis, and a custom spatial grid for collision optimization.</p>
+                    <h3>🛠️ TECH CORE</h3>
+                    <p>Built with Pure Vanilla JS & Canvas. Features procedural audio synthesis and localized data
+                        persistence.</p>
                 </div>
             </div>
-            <button id="close-help" class="btn-primary">UNDERSTOOD</button>
+            <div class="menu-buttons">
+                <button id="close-help" class="btn-primary">INITIATE GAME</button>
+            </div>
         </div>
     </div>
 

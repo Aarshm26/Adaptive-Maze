@@ -190,6 +190,9 @@ function init() {
         techEntities: document.getElementById('tech-entities')
     };
 
+    // Ensure HUD matches initial state
+    elements.techHud.style.display = game.debugMode ? 'block' : 'none';
+
     setupEventListeners();
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
@@ -319,6 +322,7 @@ function gameLoop(timestamp) {
     }
     render();
     renderMinimap();
+    updateUI(); // Move outside of update() to ensure UI reflects current state (e.g. paused/debug)
 
     if (!game.paused) {
         game.tickCount++;
@@ -357,8 +361,6 @@ function update() {
 
     // Update particles
     updateParticles();
-
-    updateUI();
 }
 
 // === A* PATHFINDING ===
@@ -788,10 +790,10 @@ function getThemeColors() {
         },
         arcade: {
             bg: '#1a1a2e',
-            grid: 'rgba(0, 0, 0, 0.1)',
-            wall: '#57606f',
-            wallBorder: '#2b2d42',
-            exit: '#f72585',
+            grid: 'rgba(255, 255, 255, 0.05)',
+            wall: '#3d3d5c',
+            wallBorder: '#f72585',
+            exit: '#ffd60a',
             player: '#4cc9f0',
             enemy: '#f72585',
             healthPowerup: '#f72585',
