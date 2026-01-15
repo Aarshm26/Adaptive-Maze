@@ -224,6 +224,11 @@ function setupEventListeners() {
     });
 
     // Sound toggle
+    document.getElementById('sound-toggle').addEventListener('click', (e) => {
+        game.soundEnabled = !game.soundEnabled;
+        e.target.textContent = game.soundEnabled ? '🔊' : '🔇';
+        playSound('move');
+    });
 
     // Theme switcher
     document.querySelectorAll('.theme-option').forEach(btn => {
@@ -295,7 +300,6 @@ function startGame() {
     initLevel();
     playSound('levelComplete');
     updateUI();
-    requestAnimationFrame(gameLoop);
 }
 
 function initLevel() {
@@ -312,23 +316,41 @@ function initLevel() {
 
 let lastFrameTime = 0;
 function gameLoop(timestamp) {
-    if (game.status !== 'playing') return;
-
     const deltaTime = timestamp - lastFrameTime;
     lastFrameTime = timestamp;
 
-    if (!game.paused) { // Only update when not paused
+    if (game.status === 'playing' && !game.paused) {
         update();
     }
+
     render();
     renderMinimap();
-    updateUI(); // Move outside of update() to ensure UI reflects current state (e.g. paused/debug)
 
-    if (!game.paused) {
+    // Technical HUD reporting logic (real-time)
+    if (game.debugMode) {
+        const now = performance.now();
+        game.fps = Math.round(1000 / (now - game.lastTick));
+        game.lastTick = now;
+
+        elements.techFps.textContent = game.fps;
+        elements.techSearch.textContent = game.nodesSearched;
+        elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length + game.particles.length;
+
+        if (game.tickCount % 60 === 0) game.nodesSearched = 0;
+    }
+
+    updateUI();
+
+    if (game.status === 'playing' && !game.paused) {
         game.tickCount++;
     }
     requestAnimationFrame(gameLoop);
 }
+
+// Start the animation loop immediately on load
+window.addEventListener('load', () => {
+    requestAnimationFrame(gameLoop);
+});
 
 function update() {
     // Smooth movement
