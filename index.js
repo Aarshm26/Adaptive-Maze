@@ -1036,19 +1036,6 @@ function updateUI() {
     elements.abilityBar.style.width = Math.max(0, game.abilityCharge) + '%';
     elements.highscoreDisplay.textContent = Math.floor(game.highScore);
 
-    // Update Technical Overlay
-    if (game.debugMode) {
-        const now = performance.now();
-        game.fps = Math.round(1000 / (now - game.lastTick));
-        game.lastTick = now;
-
-        elements.techFps.textContent = game.fps;
-        elements.techSearch.textContent = game.nodesSearched;
-        elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length + game.particles.length;
-
-        // Reset search count periodically for visibility
-        if (game.tickCount % 60 === 0) game.nodesSearched = 0;
-    }
 }
 
 function showMessage(text) {
