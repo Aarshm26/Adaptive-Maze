@@ -36,8 +36,8 @@ body[data-theme="arcade"] {
     --text-secondary: #00f3ff;
     --text-dim: #f72585;
 
-    --glow-primary: 0 0 15px rgba(247, 37, 133, 0.5);
-    --glow-secondary: 0 4px 15px var(--color-secondary);
+    --glow-primary: 0 0 15px rgba(247, 37, 133, 0.7);
+    --glow-secondary: 0 0 15px rgba(76, 201, 240, 0.7);
 
     --grid-line: rgba(0, 0, 0, 0.1);
     --wall-color: #57606f;
@@ -182,12 +182,7 @@ body[data-theme="arcade"]::before {
 }
 
 .panel.condensed {
-    max-width: 500px;
-    padding: 1.5rem;
-}
-
-.panel.condensed {
-    max-width: 500px;
+    max-width: 400px;
     padding: 1.5rem;
     text-align: center;
 }
@@ -270,8 +265,8 @@ body[data-theme="arcade"] .panel {
 }
 
 .glitch.small {
-    font-size: 1.8rem;
-    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    margin-bottom: 0.8rem;
 }
 
 .description {

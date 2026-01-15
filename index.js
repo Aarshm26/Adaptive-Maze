@@ -326,17 +326,21 @@ function gameLoop(timestamp) {
     render();
     renderMinimap();
 
-    // Technical HUD reporting logic (real-time)
+    // Technical HUD reporting logic (real-time, optimized)
     if (game.debugMode) {
         const now = performance.now();
-        game.fps = Math.round(1000 / (now - game.lastTick));
+        const delta = now - game.lastTick;
         game.lastTick = now;
 
-        elements.techFps.textContent = game.fps;
-        elements.techSearch.textContent = game.nodesSearched;
-        elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length + game.particles.length;
+        // Rolling average for FPS (update every 15 frames for stability)
+        if (game.tickCount % 15 === 0) {
+            game.fps = Math.round(1000 / delta);
+            elements.techFps.textContent = game.fps;
+            elements.techSearch.textContent = game.nodesSearched;
+            elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length + game.particles.length;
+        }
 
-        if (game.tickCount % 60 === 0) game.nodesSearched = 0;
+        if (game.tickCount % 120 === 0) game.nodesSearched = 0;
     }
 
     updateUI();
@@ -767,23 +771,27 @@ function levelComplete() {
 }
 
 function gameOver() {
+    if (game.status === 'gameover') return;
     game.status = 'gameover';
-    elements.finalScore.textContent = Math.floor(game.score);
-    elements.finalLevel.textContent = game.level;
-    elements.finalCombo.textContent = 'x' + game.maxCombo;
-    elements.gameoverTitle.textContent = 'SYSTEM FAILURE';
 
-    // Persist High Score
-    if (game.score > game.highScore) {
-        game.highScore = game.score;
-        localStorage.setItem('adapt_high_score', game.highScore);
-    }
+    // Slight delay for impact
+    setTimeout(() => {
+        elements.finalScore.textContent = Math.floor(game.score);
+        elements.finalLevel.textContent = game.level;
+        elements.finalCombo.textContent = 'x' + game.maxCombo;
 
-    // Haptic feedback for game over
+        // Persist High Score
+        if (game.score > game.highScore) {
+            game.highScore = game.score;
+            localStorage.setItem('adapt_high_score', game.highScore);
+        }
+
+        playSound('gameOver');
+        showOverlay(elements.gameoverScreen);
+    }, 500);
+
+    // Immediate haptics
     if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
-
-    playSound('gameOver');
-    showOverlay(elements.gameoverScreen);
 }
 
 // === RENDERING ===
