@@ -1,4 +1,4 @@
-# 🎮 PROTOCOL: ADAPT
+#  PROTOCOL: ADAPT
 
 **A Neural Survival Simulation with Adaptive AI**
 
