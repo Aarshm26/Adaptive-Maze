@@ -110,8 +110,23 @@ function playMelody(notes, noteDuration, volume) {
 }
 
 function playDescending(notes, noteDuration, volume) {
+    const startTime = audioCtx.currentTime;
     notes.forEach((freq, i) => {
-        setTimeout(() => playTone(freq, 'triangle', noteDuration, volume * 0.7), i * noteDuration * 600);
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, startTime + i * noteDuration);
+
+        gain.gain.setValueAtTime(0, startTime + i * noteDuration);
+        gain.gain.linearRampToValueAtTime(volume * 0.7, startTime + i * noteDuration + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + i * noteDuration + noteDuration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(startTime + i * noteDuration);
+        osc.stop(startTime + i * noteDuration + noteDuration);
     });
 }
 
@@ -300,6 +315,7 @@ function handleKeyboard(e) {
 // === GAME FLOW ===
 function startGame() {
     initAudio();
+    if (audioCtx) audioCtx.resume(); // Ensure audio starts on user click
     hideOverlay(elements.startScreen);
     elements.gameInterface.style.display = 'flex';
 
@@ -522,6 +538,11 @@ function adaptMaze() {
 
     for (let y = 1; y < CONFIG.GRID_SIZE - 1; y++) {
         for (let x = 1; x < CONFIG.GRID_SIZE - 1; x++) {
+            // NEVER place a wall on player, enemies, or powerups
+            if (x === game.player.x && y === game.player.y) continue;
+            if (game.enemies.some(e => e.x === x && e.y === y)) continue;
+            if (game.powerups.some(p => p.x === x && p.y === y)) continue;
+
             const dist = Math.abs(x - game.player.x) + Math.abs(y - game.player.y);
             if (dist < 4) continue;
             if (x === game.exit.x && y === game.exit.y) continue;
@@ -688,7 +709,7 @@ function checkCollisions() {
         const dist = Math.hypot(e.vx - game.player.vx, e.vy - game.player.vy);
         if (dist < 0.7) {
             if (game.tickCount % 30 === 0) {
-                game.health -= CONFIG.ENEMY_ATTACK_DAMAGE;
+                game.health = Math.max(0, game.health - CONFIG.ENEMY_ATTACK_DAMAGE);
                 playSound('damage');
                 spawnParticles(game.player.vx, game.player.vy, 'damage', 10);
                 game.combo = 1; // Reset combo on damage
@@ -787,7 +808,10 @@ function levelComplete() {
     game.inLevelTransition = true;
     game.level++;
     game.score += 500 * game.combo;
-    game.difficulty += 0.5;
+    game.difficulty += 0.8; // Faster difficulty scaling
+
+    // Adapt maze slightly faster as levels go on
+    CONFIG.ADAPTATION_RATE = Math.min(0.25, 0.15 + (game.level * 0.01));
 
     // Persist High Score
     if (game.score > game.highScore) {
@@ -1133,8 +1157,8 @@ function updateTechnicalHUD() {
         game.fps = Math.round(30000 / timeDiff);
         game.lastHudUpdate = now;
         elements.techFps.textContent = game.fps;
-        elements.techSearch.textContent = game.nodesSearched;
-        elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length + game.particles.length;
+        elements.techSearch.textContent = Math.round(game.nodesSearched / (timeDiff / 1000));
+        elements.techEntities.textContent = 1 + game.enemies.length + game.powerups.length; // Active gameplay entities
     }
     if (game.tickCount % 120 === 0) game.nodesSearched = 0;
 }
