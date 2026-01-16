@@ -943,6 +943,79 @@ kbd.wide {
     gap: 20px;
     margin: 4px 0;
     white-space: nowrap;
+    border-bottom: 1px solid rgba(0, 243, 255, 0.1);
+    padding-bottom: 2px;
+}
+
+.tech-row span:last-child {
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+/* === SCREEN SHAKE === */
+.shake {
+    animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+    transform: translate3d(0, 0, 0);
+}
+
+@keyframes shake {
+
+    10%,
+    90% {
+        transform: translate3d(-1px, 0, 0);
+    }
+
+    20%,
+    80% {
+        transform: translate3d(2px, 0, 0);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translate3d(-4px, 0, 0);
+    }
+
+    40%,
+    60% {
+        transform: translate3d(4px, 0, 0);
+    }
+}
+
+/* === TERMINAL GLITCH === */
+.terminal-glitch {
+    animation: terminal-glitch 0.2s infinite;
+}
+
+@keyframes terminal-glitch {
+    0% {
+        transform: translate(0) skewX(0);
+        filter: hue-rotate(0deg);
+    }
+
+    20% {
+        transform: translate(-2px, 2px) skewX(1deg);
+        filter: hue-rotate(90deg);
+    }
+
+    40% {
+        transform: translate(2px, -2px) skewX(-1deg);
+        filter: hue-rotate(180deg);
+    }
+
+    60% {
+        transform: translate(-2px, -2px) skewX(2deg);
+        filter: hue-rotate(270deg);
+    }
+
+    80% {
+        transform: translate(2px, 2px) skewX(-2deg);
+        filter: hue-rotate(0deg);
+    }
+
+    100% {
+        transform: translate(0) skewX(0);
+    }
 }
 
 .technical-manual p {

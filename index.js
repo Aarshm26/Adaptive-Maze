@@ -89,8 +89,23 @@ function playTone(freq, type, duration, volume) {
 }
 
 function playMelody(notes, noteDuration, volume) {
+    const startTime = audioCtx.currentTime;
     notes.forEach((freq, i) => {
-        setTimeout(() => playTone(freq, 'sine', noteDuration, volume), i * noteDuration * 800);
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime + i * noteDuration);
+
+        gain.gain.setValueAtTime(0, startTime + i * noteDuration);
+        gain.gain.linearRampToValueAtTime(volume, startTime + i * noteDuration + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + i * noteDuration + noteDuration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(startTime + i * noteDuration);
+        osc.stop(startTime + i * noteDuration + noteDuration);
     });
 }
 
@@ -182,9 +197,11 @@ function init() {
         comboDisplay: document.getElementById('combo-display'),
         hpBar: document.getElementById('hp-bar'),
         abilityBar: document.getElementById('ability-bar'),
+        highscoreDisplay: document.getElementById('highscore-display'),
+        finalScore: document.getElementById('final-score'),
+        finalLevel: document.getElementById('final-level'),
         finalCombo: document.getElementById('final-combo'),
         gameoverTitle: document.getElementById('gameover-title'),
-        highscoreDisplay: document.getElementById('highscore-display'),
         techHud: document.getElementById('technical-hud'),
         techFps: document.getElementById('tech-fps'),
         techSearch: document.getElementById('tech-search'),
@@ -496,6 +513,13 @@ function ensurePath() {
 }
 
 function adaptMaze() {
+    const playerPos = { x: game.player.x, y: game.player.y };
+    let pathChanged = false;
+
+    // Only run A* once per adaptation cycle to get the current valid path
+    const currentPath = aStarPath(playerPos, game.exit);
+    const pathSet = new Set(currentPath.map(p => `${p.x},${p.y}`));
+
     for (let y = 1; y < CONFIG.GRID_SIZE - 1; y++) {
         for (let x = 1; x < CONFIG.GRID_SIZE - 1; x++) {
             const dist = Math.abs(x - game.player.x) + Math.abs(y - game.player.y);
@@ -506,13 +530,25 @@ function adaptMaze() {
 
             if (Math.random() < cell.adaptability * CONFIG.ADAPTATION_RATE * 0.5) {
                 const wasWall = cell.type === 'wall';
-                cell.type = wasWall ? 'empty' : 'wall';
+                const isOnPath = pathSet.has(`${x},${y}`);
 
-                const testPath = aStarPath({ x: game.player.x, y: game.player.y }, game.exit);
-                if (testPath.length === 0) {
-                    cell.type = wasWall ? 'wall' : 'empty';
+                // If we are turning an empty cell on the current path into a wall, 
+                // we MUST verify if a new path exists.
+                if (!wasWall && isOnPath) {
+                    cell.type = 'wall';
+                    const testPath = aStarPath(playerPos, game.exit);
+                    if (testPath.length === 0) {
+                        cell.type = 'empty'; // Revert
+                    } else {
+                        spawnParticles(x, y, 'adapt', 3);
+                        pathChanged = true;
+                    }
                 } else {
+                    // Changing a wall to empty or an off-path empty to wall is "safe" 
+                    // (worst case: it doesn't break the current path)
+                    cell.type = wasWall ? 'empty' : 'wall';
                     spawnParticles(x, y, 'adapt', 3);
+                    if (wasWall) pathChanged = true;
                 }
             }
         }
@@ -547,10 +583,15 @@ function spawnPowerups() {
     game.powerups = [];
     for (let i = 0; i < CONFIG.POWERUP_COUNT; i++) {
         const pos = findEmptyCell();
+        const rand = Math.random();
+        let type = 'score';
+        if (rand < 0.3) type = 'health';
+        else if (rand < 0.5) type = 'pulse';
+
         game.powerups.push({
             x: pos.x,
             y: pos.y,
-            type: Math.random() < 0.5 ? 'health' : 'score'
+            type: type
         });
     }
 }
@@ -626,6 +667,10 @@ function checkCollisions() {
                 game.health = Math.min(100, game.health + 20);
                 showMessage('+20 HP');
                 playSound('collect');
+            } else if (p.type === 'pulse') {
+                game.abilityCharge = 100;
+                showMessage('PULSE READY');
+                playSound('collect');
             } else {
                 const points = 100 * game.combo;
                 game.score += points;
@@ -647,6 +692,10 @@ function checkCollisions() {
                 playSound('damage');
                 spawnParticles(game.player.vx, game.player.vy, 'damage', 10);
                 game.combo = 1; // Reset combo on damage
+
+                // Screen Shake
+                elements.gameInterface.classList.add('shake');
+                setTimeout(() => elements.gameInterface.classList.remove('shake'), 400);
 
                 if (game.health <= 0) {
                     gameOver();
@@ -773,6 +822,10 @@ function gameOver() {
 
         playSound('gameOver');
         showOverlay(elements.gameoverScreen);
+
+        // Add extreme flicker to the whole interface on game over
+        elements.gameInterface.classList.add('terminal-glitch');
+        setTimeout(() => elements.gameInterface.classList.remove('terminal-glitch'), 2000);
     }, 500);
 
     // Immediate haptics
@@ -840,6 +893,15 @@ function render() {
     ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, size, size);
 
+    if (!game.grid || game.grid.length === 0) {
+        // Render a placeholder or just wait
+        ctx.fillStyle = colors.grid;
+        ctx.font = '20px Orbitron';
+        ctx.textAlign = 'center';
+        ctx.fillText('SYSTEM READY | STANDBY', size / 2, size / 2);
+        return;
+    }
+
     ctx.strokeStyle = colors.grid;
     ctx.lineWidth = 1;
     for (let i = 0; i <= CONFIG.GRID_SIZE; i++) {
@@ -891,7 +953,12 @@ function render() {
         const powerupPulse = Math.sin(game.tickCount * 0.15) * 2;
         const radius = cellSize / 5 + powerupPulse;
 
-        ctx.fillStyle = p.type === 'health' ? colors.healthPowerup : colors.scorePowerup;
+        const pColors = {
+            health: colors.healthPowerup,
+            score: colors.scorePowerup,
+            pulse: '#bd00ff'
+        };
+        ctx.fillStyle = pColors[p.type] || colors.scorePowerup;
 
         if (currentTheme === 'noir') {
             // Health = Plus sign, Score = Diamond
@@ -910,6 +977,12 @@ function render() {
                 ctx.closePath();
             }
             ctx.fill();
+
+            // Add subtle glow to Noir powerups
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = colors.healthPowerup;
+            ctx.stroke(); // Add a faint stroke for definition
+            ctx.shadowBlur = 0;
         } else {
             // Other themes - simple circles
             ctx.beginPath();
@@ -995,6 +1068,8 @@ function renderMinimap() {
 
     minimapCtx.fillStyle = colors.bg;
     minimapCtx.fillRect(0, 0, size, size);
+
+    if (!game.grid || game.grid.length === 0) return;
 
     for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
         for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
