@@ -1,4 +1,4 @@
-const CACHE_NAME = 'adapt-maze-v3';
+const CACHE_NAME = 'adapt-maze-v6.2';
 const ASSETS = [
     './',
     './index.html',
@@ -21,7 +21,8 @@ self.addEventListener('activate', (event) => {
                 keys.filter((key) => key !== CACHE_NAME)
                     .map((key) => caches.delete(key))
             );
-        })
+        }),
+        self.clients.claim()
     );
 });
 
