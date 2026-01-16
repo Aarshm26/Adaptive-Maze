@@ -473,21 +473,46 @@ function aStarPath(start, goal) {
 }
 
 function updateEnemyAI(enemy) {
-    const path = aStarPath({ x: enemy.x, y: enemy.y }, { x: game.player.x, y: game.player.y });
+    const distToPlayer = Math.abs(game.player.x - enemy.x) + Math.abs(game.player.y - enemy.y);
 
-    if (path.length > 0) {
-        const next = path[0];
-        enemy.x = next.x;
-        enemy.y = next.y;
-        enemy.intelligence = Math.min(0.95, (enemy.intelligence || 0.5) + 0.01);
+    if (enemy.type === 'stalker') {
+        // Stalkers stay 3 cells away, shadowing the player
+        if (distToPlayer > 3) {
+            const path = aStarPath({ x: enemy.x, y: enemy.y }, { x: game.player.x, y: game.player.y });
+            if (path.length > 0) {
+                enemy.x = path[0].x;
+                enemy.y = path[0].y;
+            }
+        } else if (distToPlayer < 3) {
+            // Back away if too close
+            const dx = Math.sign(enemy.x - game.player.x);
+            const dy = Math.sign(enemy.y - game.player.y);
+            if (isValid(enemy.x + dx, enemy.y)) enemy.x += dx;
+            else if (isValid(enemy.x, enemy.y + dy)) enemy.y += dy;
+        }
+    } else if (enemy.type === 'roamer') {
+        // Roamers patrol until player is close
+        if (distToPlayer < 6) {
+            const path = aStarPath({ x: enemy.x, y: enemy.y }, { x: game.player.x, y: game.player.y });
+            if (path.length > 0) {
+                enemy.x = path[0].x;
+                enemy.y = path[0].y;
+            }
+        } else {
+            // Random patrol
+            const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+            const d = dirs[Math.floor(Math.random() * dirs.length)];
+            if (isValid(enemy.x + d[0], enemy.y + d[1])) {
+                enemy.x += d[0];
+                enemy.y += d[1];
+            }
+        }
     } else {
-        const dx = Math.sign(game.player.x - enemy.x);
-        const dy = Math.sign(game.player.y - enemy.y);
-
-        if (Math.abs(dx) > Math.abs(dy) && isValid(enemy.x + dx, enemy.y)) {
-            enemy.x += dx;
-        } else if (isValid(enemy.x, enemy.y + dy)) {
-            enemy.y += dy;
+        // Default Hunter AI
+        const path = aStarPath({ x: enemy.x, y: enemy.y }, { x: game.player.x, y: game.player.y });
+        if (path.length > 0) {
+            enemy.x = path[0].x;
+            enemy.y = path[0].y;
         }
     }
 }
@@ -590,11 +615,16 @@ function spawnEnemies() {
     const count = CONFIG.ENEMY_BASE_COUNT + Math.floor(game.difficulty / 2);
     for (let i = 0; i < count; i++) {
         const pos = findEmptyCell();
+        let type = 'hunter';
+        if (game.level >= 2 && Math.random() < 0.3) type = 'stalker';
+        if (game.level >= 3 && Math.random() < 0.2) type = 'roamer';
+
         game.enemies.push({
             x: pos.x,
             y: pos.y,
             vx: pos.x,
             vy: pos.y,
+            type: type,
             intelligence: 0.5 + (game.difficulty * 0.1)
         });
     }
@@ -939,6 +969,13 @@ function render() {
         ctx.stroke();
     }
 
+    // Apply Chromatic Aberration (Subtle offset)
+    if (game.tickCount % 60 < 5) {
+        ctx.save();
+        ctx.translate(Math.sin(game.tickCount) * 2, 0);
+        ctx.globalAlpha = 0.3;
+    }
+
     for (let y = 0; y < CONFIG.GRID_SIZE; y++) {
         for (let x = 0; x < CONFIG.GRID_SIZE; x++) {
             if (game.grid[y][x].type === 'wall') {
@@ -1041,18 +1078,40 @@ function render() {
         const ey = e.vy * cellSize + cellSize / 2;
         const er = cellSize / 3.5;
 
-        ctx.moveTo(ex, ey - er);
-        ctx.lineTo(ex + er, ey);
-        ctx.lineTo(ex, ey + er);
-        ctx.lineTo(ex - er, ey);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 15;
         ctx.shadowColor = colors.enemy;
+
+        if (e.type === 'stalker') {
+            // Hexagon for stalkers
+            for (let i = 0; i < 6; i++) {
+                const angle = (i / 6) * Math.PI * 2;
+                const x = ex + Math.cos(angle) * er;
+                const y = ey + Math.sin(angle) * er;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+        } else if (e.type === 'roamer') {
+            // Triangle for roamers
+            ctx.moveTo(ex, ey - er);
+            ctx.lineTo(ex + er, ey + er / 2);
+            ctx.lineTo(ex - er, ey + er / 2);
+            ctx.closePath();
+        } else {
+            // Diamond for hunters
+            ctx.moveTo(ex, ey - er);
+            ctx.lineTo(ex + er, ey);
+            ctx.lineTo(ex, ey + er);
+            ctx.lineTo(ex - er, ey);
+            ctx.closePath();
+        }
         ctx.fill();
         ctx.shadowBlur = 0;
     });
+
+    if (game.tickCount % 60 < 5) {
+        ctx.restore();
+    }
 
     ctx.fillStyle = colors.player;
     ctx.shadowBlur = 15;
